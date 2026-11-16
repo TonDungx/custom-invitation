@@ -47,6 +47,8 @@ await page.goto(BASE + 'admin');
 await page.waitForSelector('#status:has-text("Đã lưu")');
 assert.ok(page.url().endsWith('/admin/'), 'redirect to trailing slash, no hash in URL');
 assert.ok(await page.isDisabled('#apply'), 'apply disabled when clean');
+assert.ok(await page.isChecked('[name=bg][value=none]'), '"Không" background selected by default');
+assert.ok(!(await page.isVisible('#bgCustom')), 'custom URL field hidden unless "Tuỳ chỉnh"');
 
 await page.fill('[name=to]', 'Linh');
 await page.fill('[name=from]', 'Minh');

@@ -19,6 +19,7 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
   --head: 4.5rem;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: calc(var(--head) + 1.5rem); }
 body { background: var(--bg); color: var(--fg); font: 300 .95rem/1.6 "Be Vietnam Pro", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
@@ -273,14 +274,15 @@ $('#fonts').innerHTML = Object.entries(FONTS).map(([k, x]) =>
 document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet',
   href: 'https://fonts.googleapis.com/css2?' + Object.values(FONTS).map(x => 'family=' + x.q.split(':')[0]).join('&') + '&display=swap&text=CormantPlayfiLdse' }));
 
-$('#bgs').innerHTML = [['', 'Không', ''], ...Object.entries(BACKGROUNDS).map(([k, b]) => [k, b.label, unsplash(b.id, 160)]), ['custom', 'Tuỳ chỉnh', '']]
+// "none" not "": RadioNodeList.value = '' does not check a radio in Chrome.
+$('#bgs').innerHTML = [['none', 'Không', ''], ...Object.entries(BACKGROUNDS).map(([k, b]) => [k, b.label, unsplash(b.id, 160)]), ['custom', 'Tuỳ chỉnh', '']]
   .map(([k, label, thumb]) => `<label class="choice"><input type="radio" name="bg" value="${k}"><span>
-    <b ${thumb ? `style="background-image:url('${thumb}')"` : ''}>${thumb ? '' : k ? '+' : '—'}</b>${label}</span></label>`).join('');
+    <b ${thumb ? `style="background-image:url('${thumb}')"` : ''}>${thumb ? '' : k === 'custom' ? '+' : '—'}</b>${label}</span></label>`).join('');
 // Keep the background sub-controls in sync with the chosen option.
 function syncBg() {
   const e = f.elements, v = e.bg.value;
   $('#bgCustom').hidden = v !== 'custom';
-  $('#bgOpts').disabled = !v;
+  $('#bgOpts').disabled = v === 'none';
   e.dimOut.value = e.bgDim.value + '%';
   e.blurOut.value = e.bgBlur.value + '%';
 }
@@ -296,7 +298,7 @@ function fill(c) {
   TEXT.forEach(k => f.elements[k].value = c[k] ?? '');
   f.elements.theme.value = c.theme; f.elements.font.value = c.font; f.elements.intro.checked = !!c.intro;
   const preset = !c.bg || BACKGROUNDS[c.bg];
-  f.elements.bg.value = preset ? c.bg : 'custom';
+  f.elements.bg.value = !c.bg ? 'none' : preset ? c.bg : 'custom';
   f.elements.bgUrl.value = preset ? '' : c.bg;
   f.elements.bgDim.value = c.bgDim ?? DEFAULT.bgDim;
   f.elements.bgBlur.value = c.bgBlur ?? DEFAULT.bgBlur;
@@ -308,7 +310,7 @@ function read() {
   TEXT.forEach(k => c[k] = f.elements[k].value.trim());
   c.theme = f.elements.theme.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
   const bg = f.elements.bg.value;
-  c.bg = bg === 'custom' ? f.elements.bgUrl.value.trim() : bg;
+  c.bg = bg === 'custom' ? f.elements.bgUrl.value.trim() : bg === 'none' ? '' : bg;
   c.bgDim = +f.elements.bgDim.value; c.bgBlur = +f.elements.bgBlur.value;
   c.stops = [...stops.children].map(r => Object.fromEntries([...r.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value.trim()])))
     .filter(s => s.name || s.time);
