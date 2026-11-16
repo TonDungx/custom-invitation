@@ -7,6 +7,7 @@
 <link rel="icon" href="data:,">
 <meta name="theme-color" content="#F7F4EE">
 <title>Một lời mời</title>
+<link rel="preconnect" href="https://api.github.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
@@ -75,7 +76,26 @@ section + section { border-top: 1px solid var(--line); }
 .btn.solid::before { background: var(--accent); }
 .btn svg { width: 14px; height: 14px; }
 
+/* Scroll cues: progress hairline (native scroll-driven, no JS) + "scroll" hint */
+.progress { position: fixed; inset: 0 0 auto; z-index: 5; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+@supports (animation-timeline: scroll()) { .progress { animation: grow linear both; animation-timeline: scroll(root); } }
+@keyframes grow { to { transform: scaleX(1); } }
+.cue {
+  position: fixed; left: 50%; bottom: calc(1.25rem + env(safe-area-inset-bottom)); z-index: 5;
+  display: grid; justify-items: center; gap: .75rem; min-width: 44px; padding: .5rem 1rem;
+  background: none; border: 0; cursor: pointer; color: var(--muted);
+  font: 400 .7rem/1 var(--body); letter-spacing: .28em; text-transform: uppercase;
+  opacity: 0; visibility: hidden; transform: translate(-50%, 8px);
+  transition: opacity .6s var(--ease), transform .6s var(--ease), visibility 0s .6s;
+}
+.cue.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition-delay: 0s; }
+.cue i { position: relative; width: 1px; height: 2.75rem; background: var(--line); overflow: hidden; }
+.cue i::after { content: ""; position: absolute; inset: 0; background: var(--fg); transform: translateY(-100%); animation: drip 2s var(--ease-io) infinite; }
+@keyframes drip { 50% { transform: none; } to { transform: translateY(100%); } }
+.cue:hover { color: var(--fg); }
+
 /* Letter */
+.letter { min-height: 100svh; display: grid; align-content: center; }
 .letter .msg { margin-top: 2rem; white-space: pre-line; color: var(--muted); font-size: 1.05rem; }
 .sign { margin-top: 2.5rem; font-size: 1.6rem; }
 
@@ -106,14 +126,16 @@ section + section { border-top: 1px solid var(--line); }
 }
 .stop h3 { font: 400 1.85rem/1.25 var(--display); }
 .stop p { color: var(--muted); margin-top: .25rem; }
-.dir {
-  display: inline-flex; align-items: center; gap: .5rem; margin-top: .75rem; min-height: 2.75rem;
-  font-size: .75rem; letter-spacing: .2em; text-transform: uppercase; text-decoration: none; color: var(--accent);
+.links { display: flex; gap: .5rem; margin-top: 1rem; }
+.links a {
+  position: relative; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%;
+  border: 1px solid var(--line); color: var(--fg); isolation: isolate; overflow: hidden;
+  transition: color .35s var(--ease), border-color .35s var(--ease);
 }
-.dir svg { width: 14px; height: 14px; transition: transform .4s var(--ease); }
-.dir:hover svg { transform: translateX(4px); }
-.dir span { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .5s var(--ease); }
-.dir:hover span { background-size: 100% 1px; }
+.links a::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 50%; background: var(--fg); transform: scale(0); transition: transform .45s var(--ease); }
+.links a:hover { color: var(--bg); border-color: var(--fg); }
+.links a:hover::before { transform: scale(1); }
+.links svg { width: 18px; height: 18px; }
 
 /* RSVP: both states share one grid cell -> no layout jump. */
 .rsvp { text-align: center; }
@@ -133,17 +155,26 @@ footer { padding-block: 3rem calc(3rem + env(safe-area-inset-bottom)); text-alig
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; transition-delay: 0s !important; }
+  .cue i::after { animation: none; transform: none; }
 }
 </style>
 <script src="shared.js"></script>
 </head>
 <body class="locked">
 <div class="cover" id="cover" hidden></div>
+<div class="progress" aria-hidden="true"></div>
 <main id="app"></main>
+<button class="cue" id="cue" type="button">Cuộn xuống<i aria-hidden="true"></i></button>
 
 <script type="module">
 const $ = s => document.querySelector(s);
-const arrow = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8h13M9 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
+// Monoline icons, one stroke weight, so they read as a set.
+const svg = p => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS = {
+  map: svg('<path d="M12 21s-6.5-5.8-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 15.2 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.3"/>'),
+  fb: svg('<path d="M14.5 21v-7.5h2.6l.4-3h-3V8.7c0-.9.3-1.5 1.6-1.5h1.6V4.5a20 20 0 0 0-2.4-.1c-2.4 0-4 1.4-4 4.1v2h-2.6v3h2.6V21"/>'),
+  ig: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6" fill="currentColor"/>'),
+};
 let opened = false, cfg, timer, io;
 
 function render() {
@@ -189,13 +220,15 @@ function render() {
       <p class="eyebrow" data-r>Lịch trình</p>
       <ol class="stops" data-r>
         ${cfg.stops.map((s, i) => {
-          const m = mapUrl(s.address);
+          const links = [['Google Maps', mapUrl(s.address), ICONS.map], ['Facebook', fbUrl(s.facebook), ICONS.fb], ['Instagram', igUrl(s.instagram), ICONS.ig]]
+            .filter(l => l[1]);
           return `<li class="stop" data-r style="--d:${i + 1}">
             <time>${esc(s.time)}</time>
             <div class="body">
               <h3>${esc(s.name)}</h3>
               ${s.note ? `<p>${esc(s.note)}</p>` : ''}
-              ${m ? `<a class="dir" href="${esc(m)}" target="_blank" rel="noopener"><span>Chỉ đường</span>${arrow}</a>` : ''}
+              ${links.length ? `<div class="links">${links.map(([n, u, svg]) =>
+                `<a href="${esc(u)}" target="_blank" rel="noopener" aria-label="${n}: ${esc(s.name)}" title="${n}">${svg}</a>`).join('')}</div>` : ''}
             </div>
           </li>`;
         }).join('')}
@@ -244,12 +277,22 @@ function reveal(root, instant) {
   els.forEach(e => io.observe(e));
 }
 
+// Show the scroll cue until the reader starts scrolling.
+function showCue() {
+  const cue = $('#cue');
+  if (scrollY > 40 || document.documentElement.scrollHeight <= innerHeight + 40) return;
+  setTimeout(() => cue.classList.add('show'), 1400);
+  addEventListener('scroll', () => cue.classList.remove('show'), { passive: true, once: true });
+}
+$('#cue').onclick = () => $('#app section:nth-of-type(2)')?.scrollIntoView({ behavior: 'smooth' });
+
 function openCover() {
   opened = true;
   const c = $('#cover');
   c.classList.add('out');
   document.body.classList.remove('locked');
   setTimeout(() => reveal($('#app')), 350);
+  showCue();
   c.addEventListener('transitionend', e => { if (e.target === c) c.hidden = true; }, { once: true });
 }
 
@@ -269,7 +312,7 @@ function downloadIcs(d) {
 }
 
 async function boot(first) {
-  cfg = await readHash();
+  cfg = await readConfig('config.json');
   await Promise.race([applyStyle(cfg), new Promise(r => setTimeout(r, 1500))]);
   render();
   const c = $('#cover');
@@ -280,6 +323,7 @@ async function boot(first) {
   } else {
     c.hidden = true; document.body.classList.remove('locked');
     reveal($('#app'), !first); // live edits from admin: no re-animation
+    if (first) showCue();
   }
   document.body.classList.add('ready');
 }

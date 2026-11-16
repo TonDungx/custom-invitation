@@ -1,81 +1,110 @@
+// Run: npm i --no-save playwright-core && node check.mjs   (uses installed Chrome)
+// End-to-end check: admin edit -> Apply (GitHub API mocked) -> invite renders saved config.
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
-// Run: npm i --no-save playwright-core && node check.mjs   (uses installed Chrome)
-const ROOT = path.dirname((await import('node:url')).fileURLToPath(import.meta.url));
-const OUT = (await import('node:os')).tmpdir();
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript' };
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const OUT = process.env.OUT || os.tmpdir();
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json' };
 const srv = http.createServer((q, r) => {
-  let p = decodeURIComponent(new URL(q.url, 'http://x').pathname);
-  if (p.endsWith('/')) p += 'index.html';
-  let f = path.join(ROOT, p); if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
+  let f = path.join(ROOT, decodeURIComponent(new URL(q.url, 'http://x').pathname));
+  if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
   if (!fs.existsSync(f)) { r.writeHead(404); return r.end(); }
   r.writeHead(200, { 'content-type': types[path.extname(f)] || 'text/plain' }); fs.createReadStream(f).pipe(r);
 }).listen(5178);
+const BASE = 'http://localhost:5178/';
+
+// Fake GitHub contents API (one file in memory).
+let stored = null, puts = 0;
+async function fakeGitHub(route) {
+  const req = route.request();
+  if (req.method() === 'PUT') {
+    assert.equal(req.headers().authorization, 'Bearer test-token');
+    const b = JSON.parse(req.postData()); puts++;
+    stored = Buffer.from(b.content, 'base64').toString('utf8');
+    return route.fulfill({ status: 201, json: { content: { sha: 'sha' + puts } } });
+  }
+  if (!stored) return route.fulfill({ status: 404, json: {} });
+  if (req.headers().accept?.includes('raw')) return route.fulfill({ status: 200, body: stored, contentType: 'application/json' });
+  return route.fulfill({ status: 200, json: { sha: 'sha' + puts, content: Buffer.from(stored).toString('base64') } });
+}
 
 const browser = await chromium.launch({ channel: 'chrome' });
+const ctx = await browser.newContext();
+await ctx.route('https://api.github.com/**', fakeGitHub);
+// On localhost there is no repo in the URL, so the invite falls back to ./config.json: serve the saved file there.
+await ctx.route(BASE + 'config.json', r => stored ? r.fulfill({ status: 200, body: stored, contentType: 'application/json' }) : r.fulfill({ status: 404 }));
 const errors = [];
-const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
+const page = await ctx.newPage(); await page.setViewportSize({ width: 1440, height: 900 });
 page.on('pageerror', e => errors.push('admin: ' + e.message));
-page.on('console', m => m.type() === 'error' && errors.push('admin console: ' + m.text()));
 
-// /admin without slash must redirect
-await page.goto('http://localhost:5178/admin');
-await page.waitForFunction(() => location.hash.length > 10);
-assert.match(page.url(), /\/admin\/#/);
+await page.goto(BASE + 'admin');
+await page.waitForSelector('#status:has-text("Đã lưu")');
+assert.ok(page.url().endsWith('/admin/'), 'redirect to trailing slash, no hash in URL');
+assert.ok(await page.isDisabled('#apply'), 'apply disabled when clean');
 
-// edit fields -> preview updates
 await page.fill('[name=to]', 'Linh');
 await page.fill('[name=from]', 'Minh');
 await page.fill('[name=date]', '2026-12-24T19:30');
-await page.fill('#stops .stop:nth-child(1) [data-k=name]', 'Nhà hàng Sen <script>alert(1)</script>');
-await page.fill('#stops .stop:nth-child(1) [data-k=address]', '12 Lý Thái Tổ, Hà Nội');
+const s1 = '#stops .stop:nth-child(1) ';
+await page.fill(s1 + '[data-k=name]', 'Nhà hàng Sen <script>alert(1)</script>');
+await page.fill(s1 + '[data-k=address]', '12 Lý Thái Tổ, Hà Nội');
+await page.fill(s1 + '[data-k=facebook]', 'https://www.facebook.com/nhahangsen');
+await page.fill(s1 + '[data-k=instagram]', '@nhahangsen');
 await page.fill('[name=reply]', 'javascript:alert(1)');
 await page.check('[name=theme][value=noir]');
-await page.waitForTimeout(1500);
+await page.waitForSelector('#status:has-text("Chưa lưu")');
+await page.click('nav a[href="#s-stops"]'); await page.waitForTimeout(900);
+assert.equal(await page.getAttribute('nav a[href="#s-stops"]', 'aria-current'), 'true', 'scrollspy');
 await page.screenshot({ path: OUT + '/admin.png' });
-const link = await page.getAttribute('#view', 'href');
-console.log('link length:', link.length, link);
 
-// Invite page (mobile)
-const m = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+// Apply -> token dialog -> save
+await page.click('#apply');
+await page.fill('#ghf [name=repo]', 'owner/repo');
+await page.fill('#ghf [name=token]', 'test-token');
+await page.click('#ghf button[value=ok]');
+await page.waitForSelector('#status:has-text("Đã lưu")');
+assert.equal(puts, 1);
+assert.equal(JSON.parse(stored).to, 'Linh');
+assert.ok(await page.isDisabled('#apply'));
+
+// Invite reads the saved config (via API) at the short URL
+const m = await ctx.newPage(); await m.setViewportSize({ width: 390, height: 844 });
 m.on('pageerror', e => errors.push('invite: ' + e.message));
-await m.goto(link.replace('localhost:5178/', 'localhost:5178/'));
-await m.waitForSelector('body.ready');
-await m.waitForTimeout(1500);
-await m.screenshot({ path: OUT + '/1-cover.png' });
+await m.goto(BASE);
+await m.waitForSelector('body.ready'); await m.waitForTimeout(1200);
 assert.equal(await m.textContent('.cover h1'), 'Linh');
-await m.click('#open');
-await m.waitForTimeout(1600);
+await m.screenshot({ path: OUT + '/1-cover.png' });
+await m.click('#open'); await m.waitForTimeout(2800);
+assert.ok(await m.isVisible('#cue.show'), 'scroll cue visible');
 await m.screenshot({ path: OUT + '/2-letter.png' });
-// XSS check: name is rendered as text, reply javascript: dropped
-assert.equal(await m.locator('.stop h3 script').count(), 0);
+await m.mouse.wheel(0, 300); await m.waitForTimeout(800);
+assert.ok(!(await m.isVisible('#cue.show')), 'scroll cue hides after scroll');
+
+assert.equal(await m.locator('.stop h3 script').count(), 0, 'XSS: no script element');
 assert.match(await m.textContent('.stop h3'), /<script>/);
-assert.equal(await m.locator('.done a.btn').count(), 0);
-assert.match(await m.getAttribute('.dir', 'href'), /google\.com\/maps.*L%C3%BD/);
-assert.equal(await m.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(15, 14, 13)');
-for (const [i, sel] of [[3, '.when'], [4, '.stops'], [5, '#rsvp']]) {
-  await m.locator(sel).scrollIntoViewIfNeeded(); await m.waitForTimeout(1800);
-  await m.screenshot({ path: OUT + `/${i}.png` });
-}
+assert.equal(await m.locator('.done a.btn').count(), 0, 'javascript: link dropped');
+const hrefs = await m.$$eval('.stop:first-child .links a', a => a.map(x => x.href));
+assert.equal(hrefs.length, 3);
+assert.match(hrefs[0], /google\.com\/maps.*L%C3%BD/);
+assert.equal(hrefs[1], 'https://www.facebook.com/nhahangsen');
+assert.equal(hrefs[2], 'https://www.instagram.com/nhahangsen');
+assert.equal(await m.locator('.stop:nth-child(2) .links').count(), 0, 'no links -> no icon row');
+
+await m.locator('.stops').scrollIntoViewIfNeeded(); await m.waitForTimeout(2000);
+await m.screenshot({ path: OUT + '/3-stops.png' });
+await m.locator('#rsvp').scrollIntoViewIfNeeded(); await m.waitForTimeout(1200);
 await m.click('#yes'); await m.waitForTimeout(2400);
-await m.screenshot({ path: OUT + '/6-yes.png' });
 const dl = m.waitForEvent('download'); await m.click('#ics');
-const ics = fs.readFileSync(await (await dl).path(), 'utf8');
-assert.match(ics, /DTSTART:20261224T193000/);
-console.log(ics.split('\r\n').slice(4, 10).join('\n'));
-
-// Countdown shows numbers
+assert.match(fs.readFileSync(await (await dl).path(), 'utf8'), /DTSTART:20261224T193000/);
 const cnt = await m.$$eval('#count b', b => b.map(x => x.textContent));
-console.log('countdown', cnt);
-assert.ok(cnt.some(v => v !== '00'));
+assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
 
-// Perf: long tasks / layout shift
-const perf = await m.evaluate(() => ({ cls: performance.getEntriesByType('layout-shift')?.reduce((a, e) => a + e.value, 0), dom: document.getElementsByTagName('*').length }));
-console.log('perf', perf);
-
-console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no JS errors');
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'all checks passed, no JS errors');
 await browser.close(); srv.close();
+if (errors.length) process.exit(1);

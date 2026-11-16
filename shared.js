@@ -43,8 +43,13 @@ function safeUrl(s) {
   try { const u = new URL(s); return ['http:', 'https:', 'sms:', 'tel:', 'mailto:'].includes(u.protocol) ? u.href : ''; }
   catch { return ''; }
 }
-const mapUrl = a => !a ? '' : /^https?:\/\//i.test(a) ? safeUrl(a)
+const isUrl = s => /^https?:\/\//i.test(s);
+const mapUrl = a => !a ? '' : isUrl(a) ? safeUrl(a)
   : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a);
+// Accept a full link or just a handle ("@quanb", "quanb").
+const socialUrl = (base, s) => !s ? '' : isUrl(s) ? safeUrl(s) : base + encodeURIComponent(s.replace(/^@/, ''));
+const fbUrl = s => socialUrl('https://www.facebook.com/', s);
+const igUrl = s => socialUrl('https://www.instagram.com/', s);
 
 const b64u = {
   enc: b => btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
@@ -58,11 +63,26 @@ async function unpack(str) {
   const s = new Blob([b64u.dec(str)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
   return JSON.parse(await new Response(s).text());
 }
-async function readHash() {
-  const h = location.hash.slice(1);
-  if (!h) return structuredClone(DEFAULT);
-  try { return { ...structuredClone(DEFAULT), ...(await unpack(h)) }; }
-  catch { return structuredClone(DEFAULT); }
+// "owner/repo" when served from <owner>.github.io/<repo>/, else ''.
+function repoFromLocation() {
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  return m && location.pathname.split('/')[1] ? `${m[1]}/${location.pathname.split('/')[1]}` : '';
+}
+
+// Config source: #hash (admin preview) > config.json via GitHub API (fresh ~60s)
+// > config.json on Pages (CDN may be up to 10 min stale) > defaults.
+async function readConfig(localUrl) {
+  const D = structuredClone(DEFAULT), h = location.hash.slice(1);
+  if (h) try { return { ...D, ...(await unpack(h)) }; } catch {}
+  const repo = repoFromLocation();
+  for (const url of [repo && `https://api.github.com/repos/${repo}/contents/config.json`, localUrl]) {
+    if (!url) continue;
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/vnd.github.raw+json' } });
+      if (r.ok) return { ...D, ...(await r.json()) };
+    } catch {}
+  }
+  return D;
 }
 
 // Sets theme tokens + loads the display font. Resolves once the font is usable.
