@@ -14,9 +14,9 @@
   "font": "cormorant",
   "intro": true,
   "declineMode": "smoke",
-  "bg": "flowers",
-  "bgDim": 70,
-  "bgBlur": 20,
+  "bg": "https://raw.githubusercontent.com/tondungx/custom-invitation/033bb46ec774a5682dec086ca6608f0dbcfcb2f0/uploads/1794873230977.webp",
+  "bgDim": 50,
+  "bgBlur": 5,
   "stops": [
     {
       "time": "19:00",
