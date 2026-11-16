@@ -1,0 +1,33 @@
+{
+  "to": "Em",
+  "from": "Anh",
+  "title": "Một buổi tối, chỉ hai chúng mình",
+  "message": "Tuần này anh muốn dành trọn một buổi tối cho em.\nAnh đã chọn sẵn vài nơi, em chỉ cần đến thôi.",
+  "date": "2026-11-21T19:00",
+  "ask": "Em sẽ đến chứ?",
+  "accept": "Em đồng ý",
+  "thanks": "Hẹn gặp em nhé.",
+  "reply": "",
+  "replyLabel": "Nhắn cho anh",
+  "theme": "noir",
+  "font": "cormorant",
+  "intro": true,
+  "stops": [
+    {
+      "time": "19:00",
+      "name": "Nuboko",
+      "note": "Bữa tối",
+      "address": "",
+      "facebook": "",
+      "instagram": "nubokorestaurant"
+    },
+    {
+      "time": "21:00",
+      "name": "Aurora Cafe",
+      "note": "Cà phê & trò chuyện",
+      "address": "",
+      "facebook": "",
+      "instagram": "aurora.den.hanoi"
+    }
+  ]
+}
