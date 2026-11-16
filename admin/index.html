@@ -110,6 +110,9 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .choice input:focus-visible + span { outline: 1px solid var(--accent); outline-offset: 3px; }
 .thumbs .choice span { flex-direction: column; gap: .4rem; padding: .35rem .35rem .5rem; font-size: .8rem; }
 .thumbs .choice b { display: grid; place-items: center; width: 4.5rem; height: 5.5rem; background: var(--bg) center / cover; border-radius: 1px; font-weight: 300; color: var(--muted); }
+.upload { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; margin-top: 1rem; }
+#s-bg { outline: 1px dashed transparent; outline-offset: 8px; transition: outline-color .2s; }
+#s-bg.drag { outline-color: var(--accent); }
 .sliders { border: 0; padding: 0; margin: 0; }
 .sliders:disabled { opacity: .4; }
 .sliders output { color: var(--fg); letter-spacing: 0; margin-left: .25rem; }
@@ -224,6 +227,11 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
     <fieldset id="s-bg">
       <legend>Ảnh nền</legend>
       <div class="choices thumbs" id="bgs"></div>
+      <div class="upload">
+        <button class="btn" id="pick" type="button">Tải ảnh từ máy</button>
+        <input type="file" id="file" accept="image/*" hidden>
+        <span class="hint">hoặc kéo thả ảnh vào khung này. Ảnh được nén (tối đa 2400px) trước khi lưu vào repo.</span>
+      </div>
       <label id="bgCustom" style="margin-top:1rem" hidden><span class="lbl">Link ảnh (https)</span><input type="url" name="bgUrl" placeholder="https://images.unsplash.com/photo-…"></label>
       <fieldset class="grid sliders" id="bgOpts" style="margin-top:1.5rem">
         <label><span class="lbl">Độ phủ màu nền <output name="dimOut"></output></span><input type="range" name="bgDim" min="0" max="95" step="5"><span class="hint">Cao hơn → chữ dễ đọc hơn.</span></label>
@@ -299,6 +307,9 @@ $('#bgs').innerHTML = [['none', 'Không', ''], ...Object.entries(BACKGROUNDS).ma
 function syncBg() {
   const e = f.elements, v = e.bg.value;
   $('#bgCustom').hidden = v !== 'custom';
+  const custom = bgUrl(e.bgUrl.value, 0), tile = $('#bgs [value=custom] + span b');
+  tile.style.backgroundImage = custom ? `url("${custom}")` : '';
+  tile.textContent = custom ? '' : '+';
   $('#bgOpts').disabled = v === 'none';
   e.dimOut.value = e.bgDim.value + '%';
   e.blurOut.value = e.bgBlur.value + '%';
@@ -408,6 +419,49 @@ async function apply() {
     setStatus('Lỗi khi lưu', 'error'); btn.disabled = false; toast('Không lưu được (' + e.message + '). Thử lại.');
   }
 }
+
+// ---- Upload a background photo from this device ----
+// Resized + re-encoded in the browser, committed to uploads/ and referenced by commit SHA
+// (raw.githubusercontent.com, immutable -> usable immediately, no Pages rebuild wait).
+// ponytail: replaced photos stay in the repo; delete old files in uploads/ by hand if size matters.
+async function compress(file) {
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+  const c = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * s), height: Math.round(bmp.height * s) });
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); bmp.close();
+  const enc = type => new Promise(ok => c.toBlob(ok, type, .82));
+  const b = await enc('image/webp');
+  return b?.type === 'image/webp' ? b : enc('image/jpeg'); // older Safari can't encode WebP
+}
+const blobB64 = b => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.readAsDataURL(b); });
+
+async function upload(file) {
+  if (!file?.type.startsWith('image/')) return toast('Chỉ nhận file ảnh.');
+  if (file.size > 25e6) return toast('Ảnh lớn quá (tối đa 25MB).');
+  if (!(gh.token && gh.repo) && !(await askToken())) return;
+  const btn = $('#pick'); btn.disabled = true; btn.textContent = 'Đang tải ảnh…';
+  try {
+    const blob = await compress(file);
+    const path = `uploads/${Date.now()}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
+    const r = await fetch(`https://api.github.com/repos/${gh.repo}/contents/${path}`, { method: 'PUT', headers: authH(),
+      body: JSON.stringify({ message: 'chore: upload background', content: await blobB64(blob) }) });
+    if (r.status === 401 || r.status === 403 || r.status === 404) { toast('Token hoặc repo không đúng quyền.'); if (await askToken()) return upload(file); return; }
+    if (!r.ok) throw new Error(r.status);
+    const commit = (await r.json()).commit.sha;
+    f.elements.bg.value = 'custom';
+    f.elements.bgUrl.value = `https://raw.githubusercontent.com/${gh.repo}/${commit}/${path}`;
+    syncBg(); await update();
+    toast(`Đã tải ảnh (${Math.round(blob.size / 1024)} KB). Bấm Áp dụng để dùng.`);
+  } catch (e) {
+    toast('Không tải được ảnh (' + e.message + ').');
+  } finally { btn.disabled = false; btn.textContent = 'Tải ảnh từ máy'; $('#file').value = ''; }
+}
+$('#pick').onclick = () => $('#file').click();
+$('#file').onchange = e => upload(e.target.files[0]);
+const zone = $('#s-bg');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag'); });
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); upload(e.dataTransfer.files[0]); });
 
 $('#apply').onclick = apply;
 $('#gh').onclick = async () => { if (await askToken()) { await load(); toast('Đã kết nối ' + gh.repo); } };

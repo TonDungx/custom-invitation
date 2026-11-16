@@ -20,9 +20,14 @@ const srv = http.createServer((q, r) => {
 const BASE = 'http://localhost:5178/';
 
 // Fake GitHub contents API (one file in memory).
-let stored = null, puts = 0;
+let stored = null, puts = 0, uploaded = null;
 async function fakeGitHub(route) {
   const req = route.request();
+  if (req.method() === 'PUT' && req.url().includes('/contents/uploads/')) {
+    assert.equal(req.headers().authorization, 'Bearer test-token');
+    uploaded = { path: req.url().split('/contents/')[1], bytes: Buffer.from(JSON.parse(req.postData()).content, 'base64') };
+    return route.fulfill({ status: 201, json: { content: { path: uploaded.path }, commit: { sha: 'c0ffee' } } });
+  }
   if (req.method() === 'PUT') {
     assert.equal(req.headers().authorization, 'Bearer test-token');
     const b = JSON.parse(req.postData()); puts++;
@@ -80,6 +85,24 @@ assert.equal(puts, 1);
 assert.equal(JSON.parse(stored).to, 'Linh');
 assert.deepEqual([JSON.parse(stored).bg, JSON.parse(stored).bgBlur, JSON.parse(stored).bgDim], ['candles', 50, 60]);
 assert.ok(await page.isDisabled('#apply'));
+
+// Upload a background from the device: 3000x2000 PNG -> resized to <=2400px WebP, committed, URL pinned to commit sha.
+const png = Buffer.from(await page.evaluate(() => {
+  const c = Object.assign(document.createElement('canvas'), { width: 3000, height: 2000 }), g = c.getContext('2d');
+  g.fillStyle = '#3a2a1a'; g.fillRect(0, 0, 3000, 2000); g.fillStyle = '#c9a96e'; g.fillRect(800, 500, 1400, 1000);
+  return c.toDataURL('image/png').split(',')[1];
+}), 'base64');
+await page.setInputFiles('#file', { name: 'photo.png', mimeType: 'image/png', buffer: png });
+await page.waitForFunction(() => document.querySelector('[name=bgUrl]').value.includes('c0ffee'));
+assert.match(uploaded.path, /^uploads\/\d+\.webp$/);
+assert.ok(uploaded.bytes.length < png.length, 'compressed smaller than original');
+const dims = await page.evaluate(async b64 => { const b = await createImageBitmap(await (await fetch('data:image/webp;base64,' + b64)).blob()); return [b.width, b.height]; }, uploaded.bytes.toString('base64'));
+assert.deepEqual(dims, [2400, 1600], 'resized to 2400px long edge');
+assert.equal(await page.inputValue('[name=bgUrl]'), `https://raw.githubusercontent.com/owner/repo/c0ffee/${uploaded.path}`);
+assert.ok(await page.isChecked('[name=bg][value=custom]'));
+assert.ok(await page.isVisible('#bgCustom'));
+await page.waitForSelector('#status:has-text("Chưa lưu")');
+console.log('upload:', uploaded.path, png.length, '->', uploaded.bytes.length, 'bytes');
 
 // Invite reads the saved config (via API) at the short URL
 const m = await ctx.newPage(); await m.setViewportSize({ width: 390, height: 844 });
