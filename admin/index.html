@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>Cấu hình thiệp</title>
+<script>/* relative paths need a trailing slash: /admin -> /admin/ */
+if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Be+Vietnam+Pro:wght@300;400;500&display=swap">
+<style>
+:root {
+  --bg: #F7F4EE; --panel: #FFFFFF; --fg: #1C1917; --muted: #6B635A; --line: #DDD5C8; --accent: #8A6A3B;
+  --ease: cubic-bezier(.2, .7, .1, 1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--fg); font: 300 .95rem/1.6 "Be Vietnam Pro", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
+
+header {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 1rem clamp(1rem, 4vw, 2.5rem); background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+}
+h1 { font: 400 1.6rem/1 "Cormorant Garamond", serif; }
+h1 em { color: var(--muted); }
+.bar { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: clamp(1.5rem, 4vw, 4rem); padding: 2rem clamp(1rem, 4vw, 2.5rem) 4rem; max-width: 1240px; margin-inline: auto; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+fieldset { border: 0; padding-bottom: 2.5rem; margin-bottom: 2.5rem; border-bottom: 1px solid var(--line); }
+legend { font: 400 1.5rem/1.2 "Cormorant Garamond", serif; margin-bottom: 1.25rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+.full { grid-column: 1 / -1; }
+label { display: grid; gap: .4rem; }
+.lbl { font-size: .72rem; font-weight: 400; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.hint { font-size: .8rem; color: var(--muted); }
+input:not([type=radio]):not([type=checkbox]), textarea {
+  width: 100%; min-height: 2.75rem; padding: .6rem .8rem; font: inherit; font-weight: 400; color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 2px;
+  transition: border-color .2s, box-shadow .2s;
+}
+textarea { resize: vertical; min-height: 6rem; }
+input:hover, textarea:hover { border-color: #C9BFAF; }
+input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: 0 1.25rem;
+  font-family: inherit; font-size: .72rem; font-weight: 400; line-height: 1; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--fg); background: transparent; border: 1px solid var(--fg); border-radius: 2px; cursor: pointer; text-decoration: none;
+  transition: background-color .25s var(--ease), color .25s var(--ease), transform .1s;
+}
+.btn:hover { background: var(--fg); color: var(--bg); }
+.btn:active { transform: scale(.97); }
+.btn.solid { background: var(--fg); color: var(--bg); }
+.btn.solid:hover { background: var(--accent); border-color: var(--accent); }
+.btn.ghost { border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { background: transparent; color: var(--fg); }
+
+/* Stops */
+.stop { display: grid; grid-template-columns: 7rem 1fr 1fr auto; gap: .75rem; align-items: end; padding: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; margin-bottom: .75rem; }
+.stop .addr { grid-column: 1 / -2; }
+.stop .rm { grid-row: 1 / span 2; grid-column: 4; align-self: center; width: 2.75rem; padding: 0; }
+@media (max-width: 560px) { .stop { grid-template-columns: 1fr 1fr auto; } .stop .name { grid-column: 1 / -2; } .stop .rm { grid-column: 3; grid-row: 1 / span 3; } }
+.icon { width: 16px; height: 16px; }
+
+/* Theme + font swatches */
+.choices { display: flex; flex-wrap: wrap; gap: .75rem; }
+.choice { position: relative; cursor: pointer; }
+.choice input { position: absolute; opacity: 0; }
+.choice span {
+  display: flex; align-items: center; gap: .6rem; min-height: 2.75rem; padding: .5rem 1rem;
+  border: 1px solid var(--line); border-radius: 2px; background: var(--panel); transition: border-color .2s, box-shadow .2s;
+}
+.choice i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+.choice input:checked + span { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.choice input:focus-visible + span { outline: 1px solid var(--accent); outline-offset: 3px; }
+.check { display: flex; align-items: center; gap: .6rem; cursor: pointer; min-height: 2.75rem; }
+.check input { width: 18px; height: 18px; accent-color: var(--fg); }
+
+/* Preview */
+aside { position: sticky; top: 6rem; align-self: start; }
+.phone { width: 100%; max-width: 400px; margin-inline: auto; aspect-ratio: 9 / 18; max-height: calc(100vh - 10rem); border: 1px solid var(--line); border-radius: 28px; padding: 10px; background: var(--panel); box-shadow: 0 30px 60px -30px rgba(28,25,23,.25); }
+.phone iframe { width: 100%; height: 100%; border: 0; border-radius: 20px; background: var(--bg); }
+.pv-bar { display: flex; justify-content: space-between; align-items: center; max-width: 400px; margin: 0 auto 1rem; }
+@media (max-width: 960px) { aside { position: static; } .phone { max-height: 80vh; } }
+
+.toast { position: fixed; left: 50%; bottom: 1.5rem; z-index: 9; padding: .75rem 1.25rem; background: var(--fg); color: var(--bg); font-size: .85rem; border-radius: 2px;
+  transform: translate(-50%, 1rem); opacity: 0; pointer-events: none; transition: opacity .25s, transform .35s var(--ease); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
+</style>
+<script src="../shared.js"></script>
+</head>
+<body>
+<header>
+  <h1>Thiệp mời <em>· cấu hình</em></h1>
+  <div class="bar">
+    <button class="btn ghost" id="reset" type="button">Đặt lại</button>
+    <a class="btn" id="view" target="_blank" rel="noopener">Mở trang</a>
+    <button class="btn solid" id="copy" type="button">Sao chép link</button>
+  </div>
+</header>
+
+<div class="layout">
+  <form id="f" autocomplete="off" onsubmit="return false">
+    <fieldset>
+      <legend>Lời mời</legend>
+      <div class="grid">
+        <label><span class="lbl">Gửi đến</span><input name="to" required maxlength="40"></label>
+        <label><span class="lbl">Ký tên</span><input name="from" required maxlength="40"></label>
+        <label class="full"><span class="lbl">Tiêu đề</span><input name="title" maxlength="80"></label>
+        <label class="full"><span class="lbl">Lời nhắn</span><textarea name="message" maxlength="600"></textarea></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Thời gian</legend>
+      <div class="grid">
+        <label><span class="lbl">Ngày &amp; giờ gặp</span><input type="datetime-local" name="date" required></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Lịch trình</legend>
+      <div id="stops"></div>
+      <button class="btn" id="add" type="button">+ Thêm điểm đến</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Hồi đáp</legend>
+      <div class="grid">
+        <label class="full"><span class="lbl">Câu hỏi</span><input name="ask" maxlength="60"></label>
+        <label><span class="lbl">Nút đồng ý</span><input name="accept" maxlength="30"></label>
+        <label><span class="lbl">Lời cảm ơn</span><input name="thanks" maxlength="80"></label>
+        <label><span class="lbl">Link nhắn lại</span><input type="url" name="reply" placeholder="https://m.me/username"><span class="hint">Messenger, Zalo, hoặc sms:0901234567. Để trống để ẩn.</span></label>
+        <label><span class="lbl">Chữ trên nút nhắn</span><input name="replyLabel" maxlength="30"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Phong cách</legend>
+      <p class="lbl" style="margin-bottom:.75rem">Bảng màu</p>
+      <div class="choices" id="themes"></div>
+      <p class="lbl" style="margin:1.5rem 0 .75rem">Font tiêu đề</p>
+      <div class="choices" id="fonts"></div>
+      <label class="check" style="margin-top:1.5rem"><input type="checkbox" name="intro"> Hiện phong thư mở đầu</label>
+    </fieldset>
+  </form>
+
+  <aside>
+    <div class="pv-bar"><span class="lbl">Xem trước</span><button class="btn ghost" id="replay" type="button">Xem lại hiệu ứng</button></div>
+    <div class="phone"><iframe id="pv" title="Xem trước thiệp"></iframe></div>
+  </aside>
+</div>
+
+<template id="tpl">
+  <div class="stop">
+    <label><span class="lbl">Giờ</span><input type="time" data-k="time"></label>
+    <label class="name"><span class="lbl">Tên quán</span><input data-k="name" maxlength="60"></label>
+    <label><span class="lbl">Ghi chú</span><input data-k="note" maxlength="80"></label>
+    <label class="addr"><span class="lbl">Địa chỉ hoặc link Google Maps</span><input data-k="address" maxlength="300"></label>
+    <button class="btn ghost rm" type="button" aria-label="Xoá điểm đến"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.2"/></svg></button>
+  </div>
+</template>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="module">
+const $ = s => document.querySelector(s), f = $('#f'), stops = $('#stops');
+const TEXT = ['to', 'from', 'title', 'message', 'date', 'ask', 'accept', 'thanks', 'reply', 'replyLabel'];
+const KEY = 'invite-draft';
+let link = '';
+
+$('#themes').innerHTML = Object.entries(THEMES).map(([k, t]) =>
+  `<label class="choice"><input type="radio" name="theme" value="${k}"><span><i style="background:linear-gradient(135deg,${t.bg} 50%,${t.accent} 50%)"></i>${t.label}</span></label>`).join('');
+$('#fonts').innerHTML = Object.entries(FONTS).map(([k, x]) =>
+  `<label class="choice"><input type="radio" name="font" value="${k}"><span style="font-family:${x.display.replace(/"/g, "'")};font-size:1.2rem">${x.label}</span></label>`).join('');
+// Load preview faces for the font picker only (small, cached by the browser).
+document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet',
+  href: 'https://fonts.googleapis.com/css2?' + Object.values(FONTS).map(x => 'family=' + x.q.split(':')[0]).join('&') + '&display=swap&text=CormantPlayfiLdse' }));
+
+function addStop(s = {}) {
+  const row = $('#tpl').content.firstElementChild.cloneNode(true);
+  row.querySelectorAll('[data-k]').forEach(i => i.value = s[i.dataset.k] ?? '');
+  row.querySelector('.rm').onclick = () => { row.remove(); update(); };
+  stops.append(row);
+}
+
+function fill(c) {
+  TEXT.forEach(k => f.elements[k].value = c[k] ?? '');
+  f.elements.theme.value = c.theme; f.elements.font.value = c.font; f.elements.intro.checked = !!c.intro;
+  stops.replaceChildren(); (c.stops || []).forEach(addStop);
+}
+
+function read() {
+  const c = {};
+  TEXT.forEach(k => c[k] = f.elements[k].value.trim());
+  c.theme = f.elements.theme.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
+  c.stops = [...stops.children].map(r => Object.fromEntries([...r.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value.trim()])))
+    .filter(s => s.name || s.time);
+  return c;
+}
+
+const shareBase = new URL('../', location.href).href;
+async function update() {
+  const c = read(), h = await pack(c);
+  link = shareBase + '#' + h;
+  $('#view').href = link;
+  $('#pv').src = '../index.html#' + h;     // fragment change -> no reload, page re-renders
+  history.replaceState(null, '', '#' + h); // admin URL is itself an editable save
+  try { localStorage.setItem(KEY, h); } catch {}
+}
+let t; f.addEventListener('input', () => { clearTimeout(t); t = setTimeout(update, 250); });
+
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el.t); el.t = setTimeout(() => el.classList.remove('show'), 1800); }
+
+$('#add').onclick = () => { addStop(); stops.lastElementChild.querySelector('[data-k=time]').focus(); update(); };
+$('#copy').onclick = async () => {
+  await update();
+  try { await navigator.clipboard.writeText(link); toast('Đã sao chép link'); }
+  catch { prompt('Sao chép link này:', link); }
+};
+$('#reset').onclick = () => { if (confirm('Khôi phục nội dung mặc định?')) { fill(DEFAULT); update(); } };
+$('#replay').onclick = () => { $('#pv').src = '../index.html?r=' + Date.now() + '#' + location.hash.slice(1); };
+
+// Load order: link being edited (#hash) > saved draft > defaults.
+let saved = null; try { saved = localStorage.getItem(KEY); } catch {}
+if (!location.hash && saved) history.replaceState(null, '', '#' + saved);
+fill(await readHash());
+update();
+</script>
+</body>
+</html>
