@@ -76,6 +76,20 @@ section + section { border-top: 1px solid var(--line); }
 .btn.solid::before { background: var(--accent); }
 .btn svg { width: 14px; height: 14px; }
 
+/* Background photo: fixed layer (no background-attachment: fixed -> no iOS jank).
+   ::before = photo (+blur), ::after = theme-colour veil for legibility. Cover reuses the same layers. */
+.backdrop { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; display: none; }
+.has-bg .backdrop { display: block; }
+.has-bg .backdrop::before, .has-bg .cover::before {
+  content: ""; position: absolute; inset: calc(var(--blur, 0px) * -2); z-index: -2;
+  background: var(--bg-img, none) center / cover no-repeat; filter: blur(var(--blur, 0px));
+  transform: scale(1.08); opacity: 0; transition: transform 2.6s var(--ease), opacity 1.2s var(--ease);
+}
+.has-bg .backdrop::after, .has-bg .cover::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--bg); opacity: var(--dim, .7); }
+.ready .backdrop::before, .ready .cover::before { transform: none; opacity: 1; }
+.has-bg .cover { background: transparent; isolation: isolate; overflow: hidden; }
+.has-bg section + section, .has-bg footer { border-color: color-mix(in srgb, var(--fg) 12%, transparent); }
+
 /* Scroll cues: progress hairline (native scroll-driven, no JS) + "scroll" hint */
 .progress { position: fixed; inset: 0 0 auto; z-index: 5; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: left; }
 @supports (animation-timeline: scroll()) { .progress { animation: grow linear both; animation-timeline: scroll(root); } }
@@ -162,6 +176,7 @@ footer { padding-block: 3rem calc(3rem + env(safe-area-inset-bottom)); text-alig
 </head>
 <body class="locked">
 <div class="cover" id="cover" hidden></div>
+<div class="backdrop" aria-hidden="true"></div>
 <div class="progress" aria-hidden="true"></div>
 <main id="app"></main>
 <button class="cue" id="cue" type="button">Cuộn xuống<i aria-hidden="true"></i></button>
@@ -277,13 +292,13 @@ function reveal(root, instant) {
   els.forEach(e => io.observe(e));
 }
 
-// Show the scroll cue until the reader starts scrolling.
-function showCue() {
-  const cue = $('#cue');
-  if (scrollY > 40 || document.documentElement.scrollHeight <= innerHeight + 40) return;
-  setTimeout(() => cue.classList.add('show'), 1400);
-  addEventListener('scroll', () => cue.classList.remove('show'), { passive: true, once: true });
-}
+// Scroll cue: visible only at the very top of a page that still has content below.
+// Derived from scroll position every time, so it can never get stuck on (e.g. over the footer).
+let cueOn = false;
+const syncCue = () => $('#cue').classList.toggle('show',
+  cueOn && scrollY < 40 && document.documentElement.scrollHeight > innerHeight + 40);
+addEventListener('scroll', syncCue, { passive: true });
+function showCue() { setTimeout(() => { cueOn = true; syncCue(); }, 1400); }
 $('#cue').onclick = () => $('#app section:nth-of-type(2)')?.scrollIntoView({ behavior: 'smooth' });
 
 function openCover() {

@@ -20,7 +20,29 @@ const DEFAULT = {
   theme: 'ivory',
   font: 'cormorant',
   intro: true,
+  bg: '',      // '' | preset key | custom https URL
+  bgDim: 70,   // % of theme colour laid over the photo (keeps text readable)
+  bgBlur: 0,   // 0-100 %
 };
+
+// Free photos (Unsplash License), verified by hand for the date-night mood.
+const BACKGROUNDS = {
+  candles: { label: 'Nến',      id: '1694588062461-ea9a4f732a87' },
+  candle:  { label: 'Ánh nến',  id: '1695041404407-e1afde845b33' },
+  bokeh:   { label: 'Phố đêm',  id: '1625941834008-9e0c5b3b69f7' },
+  city:    { label: 'Đèn phố',  id: '1432847712612-926caafaa802' },
+  wine:    { label: 'Ly vang',  id: '1651346219435-47ec8267940f' },
+  flowers: { label: 'Hoa khô',  id: '1649615644692-b26f39484243' },
+  still:   { label: 'Tĩnh vật', id: '1755401679272-c2e026885af4' },
+};
+const unsplash = (id, w) => `https://images.unsplash.com/photo-${id}?w=${w}&q=70&auto=format&fit=crop`;
+function bgUrl(bg, w) {
+  if (!bg) return '';
+  if (BACKGROUNDS[bg]) return unsplash(BACKGROUNDS[bg].id, w);
+  const u = safeUrl(bg);
+  return /^https?:/.test(u) ? u : '';
+}
+const BLUR_MAX_PX = 24;
 
 const THEMES = {
   ivory: { label: 'Ivory', bg: '#F7F4EE', fg: '#1C1917', muted: '#6B635A', line: '#DDD5C8', accent: '#8A6A3B' },
@@ -92,10 +114,27 @@ function applyStyle(cfg) {
   r.setProperty('--display', f.display);
   r.colorScheme = cfg.theme === 'noir' ? 'dark' : 'light';
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.bg);
+  return Promise.all([loadFont(f), applyBackground(cfg, r)]);
+}
+
+function loadFont(f) {
   const href = `https://fonts.googleapis.com/css2?family=${f.q}&family=Be+Vietnam+Pro:wght@300;400;500&display=swap`;
   let link = document.getElementById('font');
   if (link?.href === href) return Promise.resolve();
   link ??= Object.assign(document.head.appendChild(document.createElement('link')), { id: 'font', rel: 'stylesheet' });
   return new Promise(ok => { link.onload = link.onerror = ok; link.href = href; })
     .then(() => document.fonts.load(`400 1em ${f.display}`, 'Ểm'));
+}
+
+// Sets --bg-img / --dim / --blur. Blurred photos are fetched smaller (detail is blurred away anyway).
+function applyBackground(cfg, r) {
+  const blur = Math.min(100, Math.max(0, +cfg.bgBlur || 0)) / 100 * BLUR_MAX_PX;
+  const w = Math.min(2400, Math.ceil(innerWidth * devicePixelRatio / (blur ? 960 : 480)) * 480);
+  const url = bgUrl(cfg.bg, w);
+  r.setProperty('--dim', Math.min(95, Math.max(0, cfg.bgDim ?? 70)) / 100);
+  r.setProperty('--blur', blur + 'px');
+  document.documentElement.classList.toggle('has-bg', !!url);
+  if (!url) { r.removeProperty('--bg-img'); return Promise.resolve(); }
+  const img = new Image(); img.src = url;
+  return img.decode().catch(() => {}).then(() => r.setProperty('--bg-img', `url("${url}")`));
 }

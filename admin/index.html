@@ -107,6 +107,12 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .choice i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
 .choice input:checked + span { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
 .choice input:focus-visible + span { outline: 1px solid var(--accent); outline-offset: 3px; }
+.thumbs .choice span { flex-direction: column; gap: .4rem; padding: .35rem .35rem .5rem; font-size: .8rem; }
+.thumbs .choice b { display: grid; place-items: center; width: 4.5rem; height: 5.5rem; background: var(--bg) center / cover; border-radius: 1px; font-weight: 300; color: var(--muted); }
+.sliders { border: 0; padding: 0; margin: 0; }
+.sliders:disabled { opacity: .4; }
+.sliders output { color: var(--fg); letter-spacing: 0; margin-left: .25rem; }
+input[type=range] { width: 100%; min-height: 2.75rem; accent-color: var(--fg); cursor: pointer; }
 .check { display: flex; align-items: center; gap: .6rem; cursor: pointer; min-height: 2.75rem; }
 .check input { width: 18px; height: 18px; accent-color: var(--fg); }
 
@@ -154,6 +160,7 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
       <li><a href="#s-stops">Lịch trình</a></li>
       <li><a href="#s-rsvp">Hồi đáp</a></li>
       <li><a href="#s-style">Phong cách</a></li>
+      <li><a href="#s-bg">Ảnh nền</a></li>
     </ol>
     <button class="btn ghost gh" id="gh" type="button">Kết nối GitHub</button>
   </nav>
@@ -200,6 +207,17 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
       <p class="lbl" style="margin:1.5rem 0 .75rem">Font tiêu đề</p>
       <div class="choices" id="fonts"></div>
       <label class="check" style="margin-top:1.5rem"><input type="checkbox" name="intro"> Hiện phong thư mở đầu</label>
+    </fieldset>
+
+    <fieldset id="s-bg">
+      <legend>Ảnh nền</legend>
+      <div class="choices thumbs" id="bgs"></div>
+      <label id="bgCustom" style="margin-top:1rem" hidden><span class="lbl">Link ảnh (https)</span><input type="url" name="bgUrl" placeholder="https://images.unsplash.com/photo-…"></label>
+      <fieldset class="grid sliders" id="bgOpts" style="margin-top:1.5rem">
+        <label><span class="lbl">Độ phủ màu nền <output name="dimOut"></output></span><input type="range" name="bgDim" min="0" max="95" step="5"><span class="hint">Cao hơn → chữ dễ đọc hơn.</span></label>
+        <label><span class="lbl">Làm mờ <output name="blurOut"></output></span><input type="range" name="bgBlur" min="0" max="100" step="5"><span class="hint">0% là không làm mờ.</span></label>
+      </fieldset>
+      <p class="hint" style="margin-top:1rem">Ảnh gợi ý từ <a href="https://unsplash.com/license" target="_blank" rel="noopener">Unsplash</a>, miễn phí sử dụng.</p>
     </fieldset>
   </form>
 
@@ -255,6 +273,19 @@ $('#fonts').innerHTML = Object.entries(FONTS).map(([k, x]) =>
 document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet',
   href: 'https://fonts.googleapis.com/css2?' + Object.values(FONTS).map(x => 'family=' + x.q.split(':')[0]).join('&') + '&display=swap&text=CormantPlayfiLdse' }));
 
+$('#bgs').innerHTML = [['', 'Không', ''], ...Object.entries(BACKGROUNDS).map(([k, b]) => [k, b.label, unsplash(b.id, 160)]), ['custom', 'Tuỳ chỉnh', '']]
+  .map(([k, label, thumb]) => `<label class="choice"><input type="radio" name="bg" value="${k}"><span>
+    <b ${thumb ? `style="background-image:url('${thumb}')"` : ''}>${thumb ? '' : k ? '+' : '—'}</b>${label}</span></label>`).join('');
+// Keep the background sub-controls in sync with the chosen option.
+function syncBg() {
+  const e = f.elements, v = e.bg.value;
+  $('#bgCustom').hidden = v !== 'custom';
+  $('#bgOpts').disabled = !v;
+  e.dimOut.value = e.bgDim.value + '%';
+  e.blurOut.value = e.bgBlur.value + '%';
+}
+f.addEventListener('input', syncBg);
+
 function addStop(s = {}) {
   const row = $('#tpl').content.firstElementChild.cloneNode(true);
   row.querySelectorAll('[data-k]').forEach(i => i.value = s[i.dataset.k] ?? '');
@@ -264,12 +295,21 @@ function addStop(s = {}) {
 function fill(c) {
   TEXT.forEach(k => f.elements[k].value = c[k] ?? '');
   f.elements.theme.value = c.theme; f.elements.font.value = c.font; f.elements.intro.checked = !!c.intro;
+  const preset = !c.bg || BACKGROUNDS[c.bg];
+  f.elements.bg.value = preset ? c.bg : 'custom';
+  f.elements.bgUrl.value = preset ? '' : c.bg;
+  f.elements.bgDim.value = c.bgDim ?? DEFAULT.bgDim;
+  f.elements.bgBlur.value = c.bgBlur ?? DEFAULT.bgBlur;
   stops.replaceChildren(); (c.stops || []).forEach(addStop);
+  syncBg();
 }
 function read() {
   const c = {};
   TEXT.forEach(k => c[k] = f.elements[k].value.trim());
   c.theme = f.elements.theme.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
+  const bg = f.elements.bg.value;
+  c.bg = bg === 'custom' ? f.elements.bgUrl.value.trim() : bg;
+  c.bgDim = +f.elements.bgDim.value; c.bgBlur = +f.elements.bgBlur.value;
   c.stops = [...stops.children].map(r => Object.fromEntries([...r.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value.trim()])))
     .filter(s => s.name || s.time);
   return c;
@@ -363,7 +403,7 @@ const spy = new IntersectionObserver(es => es.forEach(e => {
   links.forEach(a => a.removeAttribute('aria-current'));
   links.get(e.target.id)?.setAttribute('aria-current', 'true');
 }), { rootMargin: '-30% 0px -60% 0px' });
-document.querySelectorAll('fieldset').forEach(s => spy.observe(s));
+document.querySelectorAll('form > fieldset').forEach(s => spy.observe(s));
 
 load();
 </script>

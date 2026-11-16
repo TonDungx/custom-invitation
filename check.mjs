@@ -58,6 +58,11 @@ await page.fill(s1 + '[data-k=facebook]', 'https://www.facebook.com/nhahangsen')
 await page.fill(s1 + '[data-k=instagram]', '@nhahangsen');
 await page.fill('[name=reply]', 'javascript:alert(1)');
 await page.check('[name=theme][value=noir]');
+await page.check('[name=bg][value=candles]', { force: true });
+assert.ok(!(await page.isDisabled('#bgOpts')), 'bg sliders enabled when a photo is chosen');
+await page.locator('[name=bgBlur]').fill('50');
+await page.locator('[name=bgDim]').fill('60');
+assert.equal(await page.textContent('output[name=blurOut]'), '50%');
 await page.waitForSelector('#status:has-text("Chưa lưu")');
 await page.click('nav a[href="#s-stops"]'); await page.waitForTimeout(900);
 assert.equal(await page.getAttribute('nav a[href="#s-stops"]', 'aria-current'), 'true', 'scrollspy');
@@ -71,6 +76,7 @@ await page.click('#ghf button[value=ok]');
 await page.waitForSelector('#status:has-text("Đã lưu")');
 assert.equal(puts, 1);
 assert.equal(JSON.parse(stored).to, 'Linh');
+assert.deepEqual([JSON.parse(stored).bg, JSON.parse(stored).bgBlur, JSON.parse(stored).bgDim], ['candles', 50, 60]);
 assert.ok(await page.isDisabled('#apply'));
 
 // Invite reads the saved config (via API) at the short URL
@@ -79,12 +85,22 @@ m.on('pageerror', e => errors.push('invite: ' + e.message));
 await m.goto(BASE);
 await m.waitForSelector('body.ready'); await m.waitForTimeout(1200);
 assert.equal(await m.textContent('.cover h1'), 'Linh');
+const bgState = await m.evaluate(() => ({ has: document.documentElement.classList.contains('has-bg'),
+  img: getComputedStyle(document.documentElement).getPropertyValue('--bg-img'), blur: getComputedStyle(document.querySelector('.backdrop'), '::before').filter }));
+assert.ok(bgState.has && bgState.img.includes('images.unsplash.com'), 'background photo applied');
+assert.equal(bgState.blur, 'blur(12px)', '50% blur = 12px');
 await m.screenshot({ path: OUT + '/1-cover.png' });
 await m.click('#open'); await m.waitForTimeout(2800);
 assert.ok(await m.isVisible('#cue.show'), 'scroll cue visible');
 await m.screenshot({ path: OUT + '/2-letter.png' });
 await m.mouse.wheel(0, 300); await m.waitForTimeout(800);
 assert.ok(!(await m.isVisible('#cue.show')), 'scroll cue hides after scroll');
+// Regression: scrolling before the cue's delay must not leave it stuck on (it overlapped the footer).
+const m2 = await ctx.newPage(); await m2.setViewportSize({ width: 390, height: 844 });
+await m2.goto(BASE); await m2.waitForSelector('body.ready'); await m2.click('#open');
+await m2.waitForTimeout(400); await m2.mouse.wheel(0, 5000); await m2.waitForTimeout(2500);
+assert.ok(!(await m2.isVisible('#cue.show')), 'cue stays hidden at page end');
+await m2.screenshot({ path: OUT + '/end.png' }); await m2.close();
 
 assert.equal(await m.locator('.stop h3 script').count(), 0, 'XSS: no script element');
 assert.match(await m.textContent('.stop h3'), /<script>/);
