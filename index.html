@@ -15,7 +15,7 @@
   --bg: #F7F4EE; --fg: #1C1917; --muted: #6B635A; --line: #DDD5C8; --accent: #8A6A3B;
   --display: "Cormorant Garamond", serif;
   --body: "Be Vietnam Pro", system-ui, sans-serif;
-  --ease: cubic-bezier(.2, .7, .1, 1);
+  --ease: cubic-bezier(.16, 1, .3, 1); /* expo-out: quick start, long soft settle */
   --ease-io: cubic-bezier(.77, 0, .18, 1);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,20 +43,30 @@ section + section { border-top: 1px solid var(--line); }
 .rule { width: 3rem; height: 1px; background: var(--accent); margin-block: 2rem; transform-origin: left; }
 
 /* Reveal: opacity + transform only (GPU, no layout). */
-[data-r] { opacity: 0; transform: translateY(14px); transition: opacity 1s var(--ease), transform 1s var(--ease); transition-delay: calc(var(--d, 0) * 110ms); }
-.rule[data-r] { transform: scaleX(0); }
-.mask { display: block; overflow: hidden; padding-block: .14em; margin-block: -.14em; }
-.mask > span { display: block; transform: translateY(110%); transition: transform 1.2s var(--ease); transition-delay: calc(var(--d, 0) * 110ms); }
-.in[data-r], .in .mask > span, .mask.in > span { opacity: 1; transform: none; }
+[data-r] { opacity: 0; transform: translateY(18px); transition: opacity 1.2s var(--ease), transform 1.4s var(--ease); transition-delay: calc(var(--d, 0) * 120ms); }
+.rule[data-r] { transform: scaleX(0); transition-duration: 1.2s, 1.6s; }
+.in[data-r] { opacity: 1; transform: none; }
 
-/* Cover */
+/* Headlines: each word sharpens out of a soft blur and settles, staggered.
+   No clipping mask -> multi-line titles and Vietnamese diacritics never get cut mid-reveal. */
+.words[data-r] { opacity: 1; transform: none; }
+.words .w {
+  display: inline-block; opacity: 0; filter: blur(12px); transform: translateY(.3em);
+  transition: opacity 1.1s var(--ease), filter 1.2s var(--ease), transform 1.5s var(--ease);
+  transition-delay: calc(var(--d, 0) * 120ms + var(--i) * 70ms);
+}
+.words.in .w { opacity: 1; filter: blur(0); transform: none; }
+
+/* Cover: dissolves (content recedes + blurs) while the letter rises beneath. */
 .cover {
   position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center;
   background: var(--bg); padding: 2rem;
-  transition: transform 1.1s var(--ease-io);
+  transition: opacity 1.1s var(--ease) .15s, visibility 0s 1.3s;
 }
-.cover.out { transform: translateY(-100%); }
-.cover.out .cover-in { opacity: 0; transform: translateY(-2rem); transition: opacity .5s, transform .8s var(--ease-io); }
+.cover.out { opacity: 0; visibility: hidden; pointer-events: none; }
+/* Exit uses an even curve (not expo-out) so the fade is visible rather than an instant cut. */
+.cover-in { --out: cubic-bezier(.4, 0, .2, 1); transition: opacity .9s var(--out), transform 1.3s var(--out), filter 1s var(--out); }
+.cover.out .cover-in { opacity: 0; transform: scale(.96) translateY(-1rem); filter: blur(8px); }
 .cover .rule { margin-inline: auto; transform-origin: center; }
 .cover-in > * + * { margin-top: 1.25rem; }
 
@@ -201,6 +211,9 @@ const ICONS = {
   ig: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6" fill="currentColor"/>'),
 };
 let opened = false, cfg, timer, io;
+// "Một buổi tối" -> <span class="w" style="--i:0">Một</span> <span class="w" style="--i:1">buổi</span> ...
+let wi;
+const words = s => (wi = 0, String(s ?? '').split(/(\s+)/).map(t => /^\s*$/.test(t) ? t : `<span class="w" style="--i:${wi++}">${esc(t)}</span>`).join(''));
 
 function render() {
   const d = new Date(cfg.date);
@@ -215,7 +228,7 @@ function render() {
   $('#cover').innerHTML = `
     <div class="cover-in">
       <p class="eyebrow" data-r style="--d:1">Một lời mời dành cho</p>
-      <h1 class="display"><span class="mask" data-r style="--d:2"><span>${esc(cfg.to)}</span></span></h1>
+      <h1 class="display words" data-r style="--d:2">${words(cfg.to)}</h1>
       <div class="rule" data-r style="--d:4"></div>
       <p class="eyebrow" data-r style="--d:5">${esc(dateText)}</p>
       <div data-r style="--d:6"><button class="btn" id="open" type="button">Mở thư</button></div>
@@ -224,7 +237,7 @@ function render() {
   $('#app').innerHTML = `
     <section class="letter"><div class="wrap">
       <p class="eyebrow" data-r>Gửi ${esc(cfg.to)},</p>
-      <h2 class="display" style="margin-top:1.5rem"><span class="mask" data-r style="--d:1"><span>${esc(cfg.title)}</span></span></h2>
+      <h2 class="display words" data-r style="margin-top:1.5rem;--d:1">${words(cfg.title)}</h2>
       <div class="rule" data-r style="--d:3"></div>
       <p class="msg" data-r style="--d:4">${esc(cfg.message)}</p>
       <p class="sign italic" data-r style="--d:5">— ${esc(cfg.from)}</p>
@@ -261,7 +274,7 @@ function render() {
     </div></section>` : ''}
 
     <section class="rsvp" id="rsvp"><div class="wrap">
-      <h2 class="display"><span class="mask" data-r><span>${esc(cfg.ask)}</span></span></h2>
+      <h2 class="display words" data-r>${words(cfg.ask)}</h2>
       <div class="stack">
         <div class="ask" data-r style="--d:2">
           <button class="btn solid" id="yes" type="button">${esc(cfg.accept)}</button>
@@ -405,7 +418,7 @@ function openCover() {
   const c = $('#cover');
   c.classList.add('out');
   document.body.classList.remove('locked');
-  setTimeout(() => reveal($('#app')), 350);
+  setTimeout(() => reveal($('#app')), 200); // overlap with the cover fade: no empty beat
   showCue();
   c.addEventListener('transitionend', e => { if (e.target === c) c.hidden = true; }, { once: true });
 }
