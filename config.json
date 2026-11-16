@@ -12,6 +12,9 @@
   "theme": "noir",
   "font": "cormorant",
   "intro": true,
+  "bg": "flowers",
+  "bgDim": 70,
+  "bgBlur": 20,
   "stops": [
     {
       "time": "19:00",
