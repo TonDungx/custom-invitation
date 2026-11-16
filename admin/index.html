@@ -195,7 +195,18 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
       <div class="grid">
         <label class="full"><span class="lbl">Câu hỏi</span><input name="ask" maxlength="60"></label>
         <label><span class="lbl">Nút đồng ý</span><input name="accept" maxlength="30"></label>
-        <label><span class="lbl">Lời cảm ơn</span><input name="thanks" maxlength="80"></label>
+        <label><span class="lbl">Nút từ chối</span><input name="decline" maxlength="30"></label>
+        <div class="full">
+          <p class="lbl" style="margin-bottom:.6rem">Khi bấm nút từ chối</p>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="declineMode" value="dodge"><span>Né tránh</span></label>
+            <label class="choice"><input type="radio" name="declineMode" value="smoke"><span>Bốc khói</span></label>
+            <label class="choice"><input type="radio" name="declineMode" value="vanish"><span>Bốc hơi</span></label>
+            <label class="choice"><input type="radio" name="declineMode" value="off"><span>Ẩn nút</span></label>
+          </div>
+          <p class="hint" style="margin-top:.5rem" id="declineHint"></p>
+        </div>
+        <label class="full"><span class="lbl">Lời cảm ơn</span><input name="thanks" maxlength="80"></label>
         <label><span class="lbl">Link nhắn lại</span><input type="url" name="reply" placeholder="https://m.me/username"><span class="hint">Messenger, Zalo, hoặc sms:0901234567. Để trống để ẩn.</span></label>
         <label><span class="lbl">Chữ trên nút nhắn</span><input name="replyLabel" maxlength="30"></label>
       </div>
@@ -260,7 +271,13 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
 
 <script type="module">
 const $ = s => document.querySelector(s), f = $('#f'), stops = $('#stops');
-const TEXT = ['to', 'from', 'title', 'message', 'date', 'ask', 'accept', 'thanks', 'reply', 'replyLabel'];
+const TEXT = ['to', 'from', 'title', 'message', 'date', 'ask', 'accept', 'decline', 'thanks', 'reply', 'replyLabel'];
+const DECLINE_HINT = {
+  dodge: 'Rê chuột hoặc chạm vào là nút nhảy sang chỗ trống khác.',
+  smoke: 'Mỗi lần bấm nút nóng dần và bốc khói, lần thứ 4 thì cháy mất.',
+  vanish: 'Bấm một lần là nút tan thành bụi rồi biến mất.',
+  off: 'Chỉ hiện nút đồng ý.',
+};
 const GH_KEY = 'invite-gh';
 const shareUrl = new URL('../', location.href).href;
 let saved = '', sha = null;
@@ -285,6 +302,8 @@ function syncBg() {
   $('#bgOpts').disabled = v === 'none';
   e.dimOut.value = e.bgDim.value + '%';
   e.blurOut.value = e.bgBlur.value + '%';
+  $('#declineHint').textContent = DECLINE_HINT[e.declineMode.value] || '';
+  e.decline.disabled = e.declineMode.value === 'off';
 }
 f.addEventListener('input', syncBg);
 
@@ -300,6 +319,7 @@ function fill(c) {
   const preset = !c.bg || BACKGROUNDS[c.bg];
   f.elements.bg.value = !c.bg ? 'none' : preset ? c.bg : 'custom';
   f.elements.bgUrl.value = preset ? '' : c.bg;
+  f.elements.declineMode.value = c.declineMode || DEFAULT.declineMode;
   f.elements.bgDim.value = c.bgDim ?? DEFAULT.bgDim;
   f.elements.bgBlur.value = c.bgBlur ?? DEFAULT.bgBlur;
   stops.replaceChildren(); (c.stops || []).forEach(addStop);
@@ -309,6 +329,7 @@ function read() {
   const c = {};
   TEXT.forEach(k => c[k] = f.elements[k].value.trim());
   c.theme = f.elements.theme.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
+  c.declineMode = f.elements.declineMode.value;
   const bg = f.elements.bg.value;
   c.bg = bg === 'custom' ? f.elements.bgUrl.value.trim() : bg === 'none' ? '' : bg;
   c.bgDim = +f.elements.bgDim.value; c.bgBlur = +f.elements.bgBlur.value;

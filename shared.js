@@ -14,6 +14,8 @@ const DEFAULT = {
   ],
   ask: 'Em sẽ đến chứ?',
   accept: 'Em đồng ý',
+  decline: 'Để em nghĩ đã',
+  declineMode: 'dodge', // off | dodge | smoke | vanish
   thanks: 'Hẹn gặp em nhé.',
   reply: '',
   replyLabel: 'Nhắn cho anh',

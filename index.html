@@ -19,6 +19,7 @@
   --ease-io: cubic-bezier(.77, 0, .18, 1);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   background: var(--bg); color: var(--fg);
@@ -158,6 +159,15 @@ section + section { border-top: 1px solid var(--line); }
 .stack .done { opacity: 0; visibility: hidden; transform: translateY(12px); transition-delay: 0s, 0s, .8s; }
 .yes .stack .ask { opacity: 0; visibility: hidden; transform: translateY(-12px); transition-delay: 0s, 0s, .6s; }
 .yes .stack .done { opacity: 1; visibility: visible; transform: none; transition-delay: .35s, .35s, 0s; }
+.ask { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .75rem; }
+.btn.ghost { border-color: var(--line); color: var(--muted); }
+#no { --heat: 0; color: color-mix(in srgb, var(--accent) calc(var(--heat) * 100%), var(--muted)); border-color: color-mix(in srgb, var(--accent) calc(var(--heat) * 100%), var(--line));
+  transition: transform .6s cubic-bezier(.3, 1.35, .5, 1), color .3s, border-color .3s; }
+#no::before { content: none; } /* no hover fill: keeps the "heating up" colour visible */
+/* Particles for the decline button (smoke / dust). Gradient instead of filter: cheap to composite. */
+.fx { position: fixed; z-index: 20; pointer-events: none; border-radius: 50%; }
+.fx.smoke { background: radial-gradient(circle, color-mix(in srgb, var(--fg) 38%, transparent), transparent 68%); }
+.fx.dust { background: var(--fg); }
 .ring { width: 56px; height: 56px; margin: 0 auto 1.5rem; }
 .ring circle { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 164; stroke-dashoffset: 164; transform: rotate(-90deg); transform-origin: center; }
 .ring path { fill: none; stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 30; stroke-dashoffset: 30; }
@@ -253,7 +263,10 @@ function render() {
     <section class="rsvp" id="rsvp"><div class="wrap">
       <h2 class="display"><span class="mask" data-r><span>${esc(cfg.ask)}</span></span></h2>
       <div class="stack">
-        <div class="ask" data-r style="--d:2"><button class="btn solid" id="yes" type="button">${esc(cfg.accept)}</button></div>
+        <div class="ask" data-r style="--d:2">
+          <button class="btn solid" id="yes" type="button">${esc(cfg.accept)}</button>
+          ${cfg.declineMode !== 'off' && cfg.decline ? `<button class="btn ghost" id="no" type="button">${esc(cfg.decline)}</button>` : ''}
+        </div>
         <div class="done" aria-live="polite">
           <svg class="ring" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26"/><path d="M20 28.5l5.5 5.5L37 22.5"/></svg>
           <p class="italic" style="font-size:1.75rem">${esc(cfg.thanks)}</p>
@@ -268,6 +281,7 @@ function render() {
     <footer><p class="eyebrow">${esc(cfg.from)} &amp; ${esc(cfg.to)}</p></footer>`;
 
   $('#yes').onclick = () => $('#rsvp').classList.add('yes');
+  setupDecline();
   $('#ics')?.addEventListener('click', () => downloadIcs(d));
   $('#open').onclick = openCover;
 
@@ -280,6 +294,91 @@ function render() {
       [s / 86400 | 0, s % 86400 / 3600 | 0, s % 3600 / 60 | 0, s % 60].forEach((v, i) => cells[i].textContent = String(v).padStart(2, '0'));
     };
     tick(); timer = setInterval(tick, 1000);
+  }
+}
+
+// ---- Decline button: it can never actually be pressed. ----
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function particles(el, count, kind) {
+  if (calm()) return;
+  const r = el.getBoundingClientRect(), smoke = kind === 'smoke';
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('i'), size = smoke ? 18 + Math.random() * 28 : 2 + Math.random() * 3;
+    p.className = 'fx ' + kind;
+    Object.assign(p.style, { width: size + 'px', height: size + 'px',
+      left: r.left + Math.random() * r.width - size / 2 + 'px', top: r.top + r.height * (smoke ? .35 : Math.random()) - size / 2 + 'px' });
+    document.body.append(p);
+    const dx = (Math.random() - .5) * (smoke ? 90 : 70), dy = -(40 + Math.random() * (smoke ? 130 : 100));
+    p.animate([
+      { transform: 'translate(0,0) scale(.4)', opacity: smoke ? .6 : .9 },
+      { transform: `translate(${dx}px,${dy}px) scale(${smoke ? 2.4 : 1})`, opacity: 0 },
+    ], { duration: 900 + Math.random() * 1000, delay: Math.random() * 160, easing: 'cubic-bezier(.2,.7,.1,1)', fill: 'backwards' })
+      .onfinish = () => p.remove();
+  }
+}
+
+// Remove the button; the accept button glides to centre (View Transitions where supported).
+function removeNo(no) {
+  const done = () => no.remove();
+  document.startViewTransition && !calm() ? document.startViewTransition(done) : done();
+}
+
+function setupDecline() {
+  const no = $('#no');
+  if (!no) return;
+
+  if (cfg.declineMode === 'dodge') {
+    let tx = 0, ty = 0;
+    const flee = e => {
+      e?.preventDefault();
+      const sec = $('#rsvp').getBoundingClientRect(), r = no.getBoundingClientRect();
+      const ox = r.left - tx, oy = r.top - ty, m = 16; // untransformed position
+      const avoid = [$('#yes'), $('#rsvp h2')].map(el => el.getBoundingClientRect());
+      const minX = Math.max(sec.left, 0) + m, maxX = Math.min(sec.right, innerWidth) - r.width - m;
+      const minY = Math.max(sec.top, 0) + m, maxY = Math.min(sec.bottom, innerHeight) - r.height - m;
+      for (let i = 0; i < 40; i++) {
+        const x = minX + Math.random() * Math.max(0, maxX - minX), y = minY + Math.random() * Math.max(0, maxY - minY);
+        const hit = avoid.some(a => x < a.right + m && x + r.width > a.left - m && y < a.bottom + m && y + r.height > a.top - m);
+        if (!hit && Math.hypot(x - r.left, y - r.top) > 110) {
+          tx = x - ox; ty = y - oy;
+          no.style.transform = `translate(${tx}px, ${ty}px)`;
+          return;
+        }
+      }
+    };
+    no.addEventListener('pointerenter', e => e.pointerType === 'mouse' && flee());
+    no.addEventListener('pointerdown', flee); // touch: jumps before the tap lands
+    no.addEventListener('click', flee);       // keyboard
+    return;
+  }
+
+  if (cfg.declineMode === 'smoke') {
+    let n = 0;
+    no.onclick = () => {
+      n++;
+      no.style.setProperty('--heat', Math.min(1, n / 3));
+      no.animate([0, -4, 4, -3, 3, 0].map((x, i) => ({ transform: `translateX(${x}px) rotate(${i % 2 ? -1.5 : 1.5}deg)` })), { duration: 380 });
+      particles(no, 3 + n * 4, 'smoke');
+      if (n >= 4) {
+        no.disabled = true;
+        particles(no, 26, 'smoke');
+        no.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px) scale(.9)', filter: 'blur(6px)' }],
+          { duration: 900, delay: 250, easing: 'ease-out', fill: 'forwards' }).onfinish = () => removeNo(no);
+      }
+    };
+    return;
+  }
+
+  if (cfg.declineMode === 'vanish') {
+    no.onclick = () => {
+      no.disabled = true;
+      particles(no, 46, 'dust');
+      no.animate([
+        { opacity: 1, filter: 'blur(0)', transform: 'none', letterSpacing: '.24em' },
+        { opacity: 0, filter: 'blur(10px)', transform: 'translateY(-16px) scale(1.04)', letterSpacing: '.6em' },
+      ], { duration: 1100, easing: 'cubic-bezier(.2,.7,.1,1)', fill: 'forwards' }).onfinish = () => removeNo(no);
+    };
   }
 }
 

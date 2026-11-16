@@ -117,9 +117,50 @@ assert.equal(await m.locator('.stop:nth-child(2) .links').count(), 0, 'no links 
 await m.locator('.stops').scrollIntoViewIfNeeded(); await m.waitForTimeout(2000);
 await m.screenshot({ path: OUT + '/3-stops.png' });
 await m.locator('#rsvp').scrollIntoViewIfNeeded(); await m.waitForTimeout(1200);
+// Decline button (default mode "dodge"): it flees and never accepts/declines anything.
+const overlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+await m.waitForTimeout(1500);
+for (let i = 0; i < 6; i++) {
+  const before = await m.locator('#no').boundingBox();
+  await m.locator('#no').dispatchEvent('pointerdown'); await m.waitForTimeout(700);
+  const after = await m.locator('#no').boundingBox(), yes = await m.locator('#yes').boundingBox();
+  assert.ok(Math.hypot(after.x - before.x, after.y - before.y) > 100, 'dodge moved');
+  assert.ok(!overlap(after, yes), 'dodge never lands on the accept button');
+  assert.ok(after.x >= 0 && after.x + after.width <= 390, 'dodge stays on screen');
+}
+await m.screenshot({ path: OUT + '/dodge.png' });
+assert.ok(!(await m.locator('#rsvp.yes').count()), 'decline did nothing');
 await m.click('#yes'); await m.waitForTimeout(2400);
 const dl = m.waitForEvent('download'); await m.click('#ics');
 assert.match(fs.readFileSync(await (await dl).path(), 'utf8'), /DTSTART:20261224T193000/);
+// Other decline modes, configured through the URL hash (same path the admin preview uses).
+for (const mode of ['smoke', 'vanish']) {
+  const p = await ctx.newPage(); await p.setViewportSize({ width: 390, height: 844 });
+  p.on('pageerror', e => errors.push(mode + ': ' + e.message));
+  await p.goto(BASE + 'admin/'); await p.waitForSelector('#pv');
+  const h = await p.evaluate(mode => pack({ ...DEFAULT, intro: false, declineMode: mode }), mode);
+  await p.goto(BASE + '#' + h); await p.waitForSelector('body.ready');
+  await p.locator('#rsvp').scrollIntoViewIfNeeded(); await p.waitForTimeout(1500);
+  const clicks = mode === 'smoke' ? 4 : 1;
+  for (let i = 0; i < clicks; i++) {
+    await p.click('#no'); await p.waitForTimeout(250);
+    if (mode === 'smoke' && i === 2) { assert.ok(await p.locator('.fx.smoke').count() > 0, 'smoke particles'); await p.screenshot({ path: OUT + '/smoke.png' }); }
+    if (mode === 'smoke' && i < 3) assert.equal(await p.locator('#no').count(), 1, 'survives first 3 clicks');
+  }
+  if (mode === 'vanish') { await p.waitForTimeout(300); await p.screenshot({ path: OUT + '/vanish.png' }); }
+  await p.waitForTimeout(2000);
+  assert.equal(await p.locator('#no').count(), 0, mode + ': button removed');
+  assert.equal(await p.locator('.fx').count(), 0, mode + ': particles cleaned up');
+  assert.ok(!(await p.locator('#rsvp.yes').count()), mode + ': decline did nothing');
+  await p.close();
+}
+{ // off -> no decline button
+  const p = await ctx.newPage(); await p.goto(BASE + 'admin/'); await p.waitForSelector('#pv');
+  const h = await p.evaluate(() => pack({ ...DEFAULT, intro: false, declineMode: 'off' }));
+  await p.goto(BASE + '#' + h); await p.waitForSelector('body.ready');
+  assert.equal(await p.locator('#no').count(), 0, 'off: no decline button'); await p.close();
+}
+
 const cnt = await m.$$eval('#count b', b => b.map(x => x.textContent));
 assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
 
