@@ -1,38 +1,4 @@
 {
-  "to": "Em - Yến Nhi",
-  "from": "Người yêu em - Tôn Dũng",
-  "title": "Ngày tuyệt vời nhất",
-  "message": "Nhân dịp sinh nhật em, cũng là tròn một năm của chúng mình, anh muốn dành trọn một buổi tối chỉ cho em.",
-  "date": "2026-11-26T19:00",
-  "ask": "Em sẽ đến chứ?",
-  "accept": "Yes sir!!!",
-  "decline": "Không đi thì sao 😏",
-  "thanks": "Thank you và hẹn gặp em vào hôm đó nhé!",
-  "reply": "",
-  "replyLabel": "Iu em nhiều!!!",
-  "theme": "noir",
-  "font": "cormorant",
-  "intro": true,
-  "declineMode": "smoke",
-  "bg": "https://raw.githubusercontent.com/tondungx/custom-invitation/033bb46ec774a5682dec086ca6608f0dbcfcb2f0/uploads/1794873230977.webp",
-  "bgDim": 50,
-  "bgBlur": 5,
-  "stops": [
-    {
-      "time": "19:00",
-      "name": "Nuboko Sushi & Teppanyaki",
-      "note": "Bữa tối",
-      "address": "https://maps.app.goo.gl/sUeQdPmbJbJWK4ev8",
-      "facebook": "",
-      "instagram": "nubokorestaurant"
-    },
-    {
-      "time": "21:00",
-      "name": "Aurora Den and Drinks",
-      "note": "Cà phê & trò chuyện",
-      "address": "https://maps.app.goo.gl/kd1VesYW23ZEeiws6",
-      "facebook": "",
-      "instagram": "aurora.den.hanoi"
-    }
-  ]
+  "v": 1,
+  "enc": "t02EXiQWq9n1V1ECUm2VbyikUxUTzXz3fCvn3l9oqsnzazb09lbnsNY5nJDsubUnG6Bk3J3eEIGK89qzXpJfUvt1X7p8hKmyYjXIF3Ycl_EbK5a8OcCWymn4wOUl4PA_RadAzuGG6SMovbLFEn2MnHbhn6yX5iMP2MEbdBEzn4f8BJcH6SdoO8B9v3fQsKYOCqbkhas9XuytX9CYc8svxKIg3-GP2u7rjwwMkQL6dZzpw4aNYX_CJKgtWbzpLnUkxcYI-YFplGCIin0KRW24dFQUj4UMJd-yB4Ut4uXdGgVnsInQBAGy11BNZxU7zTil99xev35OwVHTkueBwM-rouHAnG-2WsFLnbnzta6twXq6evkRSJUpyskTuSpki4NeDpmKq0aYc8dcQLpzAFcl7UI0eN8hSaqtHlG8Bd5dSZHEnJfU5HLDbx9fwZCY5BWp-0b2xftISoxM2nFtRPS2AdjgPaqTDWdYnsLB3ejibzupLZTOrTw7hqhFhoYcGncI_YWUpznwuL0AM8P-M8geHvihLO7ZcVzeXzX65wXytvIOrc6Q8mHnIbyM0U5YU7t5-98BtKtyis2ntPTNjx51uGnDwBbTcz_MXa7X5WF2l9ykDhwZVkDeMBNvPW2d2jUOYXnqXxV_mX-oRpoR9LcFtwbJyd4JSfDdmMnTenAox5k9p7C7APszWXlyKDiKYv5fGTC4g7PnqZOBbsABJVJVV-vJvO5uTuSFizAsFjJyK0Et_ZaDqzDQ95O7zcrdsMyaB4T8R5WnLh8rvQY_HX5L14BLh6kVmzAPlsLCNO0xM-vjgFkXwUb-VBd8yUNlWyxNWa7v00NVjG0MtoUTegZDKxLmA7ctgMuC9GH1R0srUY2efhrVT_CcZWa30GOF2jjNQ45EZRGlvPr2_T_1vFhrhhwfyL62WQVLnZwS9ajjKUQJheTOzoM0ElPrlYm-zM0s6dX5ClZjvkB0cxP9Jo0U6JicL9Px0ViH6ZHwWFb8FvtkLVFpGe4zcLIq5GEakCF2911zih3UVHzf7s1En7iLxb5VyNOZ1hyaeRcrfXU1wKSFGSsw1juVKig9bdQd3PrLypqo3u8Eks9J7mY6ROg2Gobe7aY1_9T5zUiB86PAzf3JIiYalbIgJmAyVMHcORWjiI2Azk9N_qEdLEhjETHqTbOHQoAp6Dfy1sQd4l39XNXL3Sp849UfhGeS7qifUcvsAH60nkDkph4dGDX7NRzMIkZMgffMSFdIWiOXOmSFLMmdgC8Z0XEtiYXJP9i5CTP6Ps3m2CQFX_qxUcSRfjo5BLdUkwO6eB1UOFqvaK86vQdyzxg-cdpxXK885EXV4f7hKM_m0DSWy3HUf0RZmms7spLhyAIC0rdHu3YWK3pddWVLJvRD-4idz_9Iyu2ZBoWM9OjnFM6plS-4vgAmZCh0xZUzh7Tzn8qhsJdMjZ8mEpP-kxeRkI-i5FP4HsB_I4Cq3zbE8VfQAKAEEkqM_am--C1cBkcy0BaIEdIVkT-dug5Xq2QuKRcDdaZDmEhH8zLo5Ck70KdqhLzWNMAFwz76rSc6hgXCR9bFxFjfAuBwxSLiWjWAlQldP5P0stPq6jRlM5R32Bk_ud_5fZF2Yq-96cITwHt5AF6tXmdkepNey5Ge3RqEBiNnpu4PP-eUxVBcF_zyUi_ZE1s88ecWavhcdbfZghyBO-g"
 }
