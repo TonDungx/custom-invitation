@@ -7,6 +7,16 @@
 <link rel="icon" href="data:,">
 <meta name="theme-color" content="#F7F4EE">
 <title>Một lời mời</title>
+<!-- Link preview (Messenger, Zalo, iMessage…). Static: crawlers don't run JS, and the content is encrypted anyway. -->
+<meta name="description" content="Dành riêng cho một người. Mở thư để xem.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Một lời mời">
+<meta property="og:description" content="Dành riêng cho một người. Mở thư để xem.">
+<meta property="og:image" content="https://tondungx.github.io/custom-invitation/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Một lời mời">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://api.github.com" crossorigin>
 <link rel="stylesheet" href="board.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -208,6 +218,11 @@ section + section { border-top: 1px solid var(--line); }
 .yes .ring path { stroke-dashoffset: 0; transition: stroke-dashoffset .7s var(--ease) 1.5s; }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: 2rem; }
 
+.actions .btn { padding: 0 1.4rem; white-space: nowrap; }
+.inapp { margin: 1.25rem auto 0; max-width: 26rem; font-size: .85rem; color: var(--muted); }
+.locked-msg { min-height: 100svh; display: grid; align-content: center; text-align: center; }
+.locked-msg .msg { margin-top: 1.5rem; color: var(--muted); }
+
 footer { padding-block: 3rem calc(3rem + env(safe-area-inset-bottom)); text-align: center; border-top: 1px solid var(--line); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -312,16 +327,18 @@ function render() {
           <svg class="ring" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26"/><path d="M20 28.5l5.5 5.5L37 22.5"/></svg>
           <p class="italic" style="font-size:1.75rem">${esc(cfg.thanks)}</p>
           <div class="actions">
-            ${valid ? `<button class="btn" id="ics" type="button">Thêm vào lịch</button>` : ''}
+            ${valid ? `<a class="btn" id="gcal" href="${esc(googleCalUrl(d))}" target="_blank" rel="noopener">Google Calendar</a>
+              <button class="btn" id="ics" type="button">Lịch Apple / Outlook</button>` : ''}
             ${reply ? `<a class="btn" href="${esc(reply)}" target="_blank" rel="noopener">${esc(cfg.replyLabel)}</a>` : ''}
           </div>
+          ${valid && IN_APP ? `<p class="inapp">Đang mở trong ứng dụng nhắn tin, nút lịch có thể không chạy. Bấm <b>⋯</b> rồi chọn <b>Mở bằng trình duyệt</b>.</p>` : ''}
         </div>
       </div>
     </div></section>
 
     <footer><p class="eyebrow">${esc(cfg.from)} &amp; ${esc(cfg.to)}</p></footer>`;
 
-  $('#yes').onclick = () => $('#rsvp').classList.add('yes');
+  $('#yes').onclick = () => { $('#rsvp').classList.add('yes'); notify('accept'); };
   setupDecline();
   $('#ics')?.addEventListener('click', () => downloadIcs(d));
   $('#open').onclick = openCover;
@@ -373,24 +390,34 @@ function setupDecline() {
     let tx = 0, ty = 0;
     const flee = e => {
       e?.preventDefault();
-      const sec = $('#rsvp').getBoundingClientRect(), r = no.getBoundingClientRect();
-      const ox = r.left - tx, oy = r.top - ty, m = 16; // untransformed position
+      // Layout position from offsets (ignores the running transform transition): a rect read mid-slide
+      // would put the origin in the wrong place and could drop the button onto "accept".
+      const op = no.offsetParent.getBoundingClientRect(), w = no.offsetWidth, hgt = no.offsetHeight, m = 16;
+      const ox = op.left + no.offsetLeft, oy = op.top + no.offsetTop, cx = ox + tx, cy = oy + ty; // origin, current target
+      const sec = $('#rsvp').getBoundingClientRect();
       const avoid = [$('#yes'), $('#rsvp h2')].map(el => el.getBoundingClientRect());
-      const minX = Math.max(sec.left, 0) + m, maxX = Math.min(sec.right, innerWidth) - r.width - m;
-      const minY = Math.max(sec.top, 0) + m, maxY = Math.min(sec.bottom, innerHeight) - r.height - m;
-      for (let i = 0; i < 40; i++) {
-        const x = minX + Math.random() * Math.max(0, maxX - minX), y = minY + Math.random() * Math.max(0, maxY - minY);
-        const hit = avoid.some(a => x < a.right + m && x + r.width > a.left - m && y < a.bottom + m && y + r.height > a.top - m);
-        if (!hit && Math.hypot(x - r.left, y - r.top) > 110) {
-          tx = x - ox; ty = y - oy;
-          no.style.transform = `translate(${tx}px, ${ty}px)`;
-          return;
+      // Prefer free spots inside the RSVP section; on cramped screens (iPhone SE) fall back to the whole viewport.
+      // Keep the farthest non-overlapping candidate, so the button always visibly runs away.
+      const areas = [[Math.max(sec.top, 0), Math.min(sec.bottom, innerHeight)], [0, innerHeight]];
+      let best = null;
+      for (const [top, bottom] of areas) {
+        const minX = m, maxX = innerWidth - w - m, minY = top + m, maxY = bottom - hgt - m;
+        for (let i = 0; i < 60; i++) {
+          const x = minX + Math.random() * Math.max(0, maxX - minX), y = minY + Math.random() * Math.max(0, maxY - minY);
+          if (avoid.some(a => x < a.right + m && x + w > a.left - m && y < a.bottom + m && y + hgt > a.top - m)) continue;
+          const d = Math.hypot(x - cx, y - cy);
+          if (!best || d > best.d) best = { x, y, d };
         }
+        if (best && best.d > 110) break;
       }
+      if (!best) return;
+      tx = best.x - ox; ty = best.y - oy;
+      no.style.transform = `translate(${tx}px, ${ty}px)`;
     };
     no.addEventListener('pointerenter', e => e.pointerType === 'mouse' && flee());
-    no.addEventListener('pointerdown', flee); // touch: jumps before the tap lands
-    no.addEventListener('click', flee);       // keyboard
+    no.addEventListener('pointerdown', flee); // touch/mouse: jumps before the press lands
+    // A tap also fires "click" right after pointerdown: only keyboard activation (detail 0) should flee again.
+    no.addEventListener('click', e => { e.preventDefault(); if (e.detail === 0) flee(e); });
     return;
   }
 
@@ -463,8 +490,16 @@ thumb.addEventListener('pointerdown', e => {
 // Scroll cue: visible only at the very top of a page that still has content below.
 // Derived from scroll position every time, so it can never get stuck on (e.g. over the footer).
 let cueOn = false;
+// Short screens (e.g. iPhone SE): never draw the cue over text/photos of the first screen.
+function cueOverlaps() {
+  const c = $('#cue').getBoundingClientRect();
+  return [...document.querySelectorAll('#app section:first-of-type [data-r], #app .it-field, #app .it-text, #app .it-image')].some(e => {
+    const r = e.getBoundingClientRect();
+    return r.width && r.bottom > c.top && r.top < c.bottom && r.right > c.left && r.left < c.right;
+  });
+}
 const syncCue = () => $('#cue').classList.toggle('show',
-  cueOn && scrollY < 40 && document.documentElement.scrollHeight > innerHeight + 40);
+  cueOn && scrollY < 40 && document.documentElement.scrollHeight > innerHeight + 40 && !cueOverlaps());
 addEventListener('scroll', syncCue, { passive: true });
 function showCue() { setTimeout(() => { cueOn = true; syncCue(); }, 1400); }
 $('#cue').onclick = () => $('#app section:nth-of-type(2)')?.scrollIntoView({ behavior: 'smooth' });
@@ -480,16 +515,35 @@ function openCover() {
   c.addEventListener('transitionend', e => { if (e.target === c) c.hidden = true; }, { once: true });
 }
 
-function downloadIcs(d) {
-  const f = x => `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, '0')}${String(x.getDate()).padStart(2, '0')}T${String(x.getHours()).padStart(2, '0')}${String(x.getMinutes()).padStart(2, '0')}00`;
-  const t = s => String(s ?? '').replace(/[\\,;]/g, '\\$&').replace(/\n/g, '\\n');
-  const end = new Date(+d + 4 * 3600e3);
+// Calendar event shared by Google Calendar and .ics. Times are "floating" (viewer's local time).
+const IN_APP = /FBAN|FBAV|FB_IAB|Messenger|Instagram|Zalo|Line\//i.test(navigator.userAgent);
+const calStamp = x => `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, '0')}${String(x.getDate()).padStart(2, '0')}T${String(x.getHours()).padStart(2, '0')}${String(x.getMinutes()).padStart(2, '0')}00`;
+function calEvent() {
   const s0 = cfg.stops?.[0] || {};
+  return { title: `Hẹn hò cùng ${cfg.from}`,
+    location: [s0.name, /^https?:/i.test(s0.address) ? '' : s0.address].filter(Boolean).join(' - '),
+    details: (cfg.stops || []).map(s => `${s.time} ${s.name}`).join('\n') };
+}
+function googleCalUrl(d) {
+  const ev = calEvent(), q = new URLSearchParams({ action: 'TEMPLATE', text: ev.title,
+    dates: `${calStamp(d)}/${calStamp(new Date(+d + 4 * 3600e3))}`, details: ev.details, location: ev.location });
+  return 'https://calendar.google.com/calendar/render?' + q;
+}
+
+// Email notification (owner's Apps Script). Never from the admin preview (hash config / iframe).
+function notify(event) {
+  const url = notifyEndpoint(cfg.notifyUrl);
+  if (url && !cfg.preview && window === top) sendNotify(url, { event, ...cfg });
+}
+
+function downloadIcs(d) {
+  const f = calStamp;
+  const t = s => String(s ?? '').replace(/[\\,;]/g, '\\$&').replace(/\n/g, '\\n');
+  const end = new Date(+d + 4 * 3600e3), ev = calEvent();
   const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//invite//vi', 'BEGIN:VEVENT',
     `UID:${+d}@invite`, `DTSTAMP:${f(new Date())}`, `DTSTART:${f(d)}`, `DTEND:${f(end)}`,
-    `SUMMARY:${t(`Hẹn hò cùng ${cfg.from}`)}`,
-    `LOCATION:${t([s0.name, /^https?:/i.test(s0.address) ? '' : s0.address].filter(Boolean).join(' - '))}`,
-    `DESCRIPTION:${t((cfg.stops || []).map(s => `${s.time} ${s.name}`).join('\n'))}`,
+    `SUMMARY:${t(ev.title)}`, `LOCATION:${t(ev.location)}`, `DESCRIPTION:${t(ev.details)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-PT2H', `DESCRIPTION:${t(ev.title)}`, 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })), download: 'hen-ho.ics' });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -497,8 +551,13 @@ function downloadIcs(d) {
 
 async function boot(first) {
   cfg = await readConfig('config.json');
+  if (cfg.locked) return showLocked();
   await Promise.race([applyStyle(cfg), new Promise(r => setTimeout(r, 1500))]);
   render();
+  hydrateImages($('#app'));
+  if (first && cfg.notifyOpen) {
+    try { if (!sessionStorage.getItem('notified')) { sessionStorage.setItem('notified', 1); notify('open'); } } catch { notify('open'); }
+  }
   const c = $('#cover');
   if (cfg.intro && !opened) {
     c.hidden = false; c.classList.remove('out');
@@ -511,6 +570,18 @@ async function boot(first) {
   }
   document.body.classList.add('ready');
   queueSb();
+}
+
+// Encrypted config without the key in the link: never show placeholder content.
+function showLocked() {
+  $('#cover').hidden = true; document.body.classList.remove('locked');
+  $('#app').innerHTML = `<section class="locked-msg"><div class="wrap">
+    <p class="eyebrow">Một lời mời</p>
+    <h1 class="display" style="margin-top:1.25rem">Thiệp này cần link đầy đủ</h1>
+    <div class="rule" style="margin-inline:auto"></div>
+    <p class="msg">Link bạn mở thiếu phần mã sau dấu <b>#</b>. Hãy mở lại đúng link đã được gửi cho bạn.</p>
+  </div></section>`;
+  document.body.classList.add('ready');
 }
 
 boot(true);

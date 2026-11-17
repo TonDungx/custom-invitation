@@ -1,5 +1,7 @@
 # Cấu hình (`config.json`)
 
+> **Định dạng lưu:** `config.json` trong repo là `{ "v": 1, "enc": "<base64url(iv 12 byte ‖ AES-GCM ciphertext)>" }`. Nội dung bên dưới là JSON **sau khi giải mã**. Khoá 256-bit nằm trong link (`#k=<43 ký tự base64url>`) và trong `localStorage['invite-key']` của trình duyệt admin. File JSON chưa mã hoá (dữ liệu cũ) vẫn đọc được; lần lưu đầu sẽ chuyển sang mã hoá.
+
 Nguồn định nghĩa duy nhất là object `DEFAULT` trong [`shared.js`](../shared.js). File `config.json` chỉ cần chứa các trường khác mặc định. Khi đọc, cấu hình luôn được merge `{ ...DEFAULT, ...config }`, nên trường thiếu sẽ lấy giá trị mặc định.
 
 ## Bảng trường
@@ -41,6 +43,8 @@ Ba biểu tượng chỉ hiện khi có dữ liệu. Không có cái nào thì k
 | `thanks` | string ≤ 80 | `"Hẹn gặp em nhé."` | Hiện sau khi bấm đồng ý |
 | `reply` | URL | `""` | Nút "nhắn lại" sau khi đồng ý. Chỉ nhận `http(s)`, `sms:`, `tel:`, `mailto:`. Rỗng hoặc không hợp lệ thì ẩn. |
 | `replyLabel` | string ≤ 30 | `"Nhắn cho anh"` | Chữ trên nút nhắn lại |
+| `notifyUrl` | URL | `""` | Link Web App Google Apps Script (chỉ nhận `https://script.google.com/macros/s/…/exec`). Rỗng = tắt thông báo. Xem [notifications.md](notifications.md). |
+| `notifyOpen` | boolean | `false` | Báo cả khi người ấy mở thiệp (mỗi tab 1 lần) |
 
 ### Phong cách
 | Trường | Kiểu | Mặc định | Giá trị |
@@ -52,7 +56,7 @@ Ba biểu tượng chỉ hiện khi có dữ liệu. Không có cái nào thì k
 ### Ảnh nền
 | Trường | Kiểu | Mặc định | Ghi chú |
 |---|---|---|---|
-| `bg` | string | `""` | `""` = không ảnh. Key preset: `candles`, `candle`, `bokeh`, `city`, `wine`, `flowers`, `still`. Hoặc một URL `https://…` (link tự dán hoặc ảnh tải lên). URL không phải `http(s)` bị bỏ qua. |
+| `bg` | string | `""` | `""` = không ảnh. `"enc:https://raw.githubusercontent.com/…/uploads/x.bin"` = ảnh tải lên đã mã hoá. Key preset: `candles`, `candle`, `bokeh`, `city`, `wine`, `flowers`, `still`. Hoặc một URL `https://…` (link tự dán hoặc ảnh tải lên). URL không phải `http(s)` bị bỏ qua. |
 | `bgDim` | number 0–95 | `70` | % lớp màu nền theme phủ lên ảnh. Bị giới hạn trong khoảng 0–95. |
 | `bgBlur` | number 0–100 | `0` | % độ mờ. 100% = 24px. 0 = không mờ. |
 
@@ -75,7 +79,12 @@ Mỗi phần tử trong `items` (thứ tự trong mảng = thứ tự lớp, ph�
 | Trường | Kiểu | Ý nghĩa |
 |---|---|---|
 | `id` | string | Định danh duy nhất |
-| `type` | `"field"` hoặc `"text"` | `field` lấy nội dung từ form, `text` là chữ tự do |
+| `type` | `"field"`, `"text"`, `"image"`, `"shape"` | `field` lấy nội dung từ form, `text` là chữ tự do, `image` là ảnh, `shape` là hoạ tiết |
+| `src` | string | Khi `type = "image"`: `enc:https://raw…/uploads/x.bin` (ảnh đã mã hoá) hoặc link `https` |
+| `shape` | `"line"`, `"frame"`, `"circle"` | Khi `type = "shape"` |
+| `h` | number (px thiết kế) | Chiều cao của ảnh và khung |
+| `t` | number (px thiết kế) | Độ dày nét của hoạ tiết |
+| `rad` | number (px thiết kế) | Bo góc của ảnh và khung |
 | `field` | `greeting`, `to`, `title`, `message`, `sign`, `date`, `when` | Khi `type = "field"`: Lời chào ("Gửi {to},"), Tên người nhận, Tiêu đề, Lời nhắn, Chữ ký ("— {from}"), Ngày ("dd · mm · yyyy"), Thứ & giờ |
 | `text` | string | Khi `type = "text"`. Có xuống dòng. |
 | `cx`, `cy` | number (%) | **Tâm** phần tử theo % chiều rộng và chiều cao màn hình (−50 đến 150) |

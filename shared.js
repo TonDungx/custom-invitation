@@ -29,6 +29,8 @@ const DEFAULT = {
   bgY: 50,
   bgZoom: 100, // 100-300 %
   layout: null, // free layout, see "Free layout" below; null = template layout
+  notifyUrl: '',     // Google Apps Script web app URL (docs/notifications.md); lives in the encrypted config
+  notifyOpen: false, // also notify when the invite is opened (once per session)
 };
 
 // Free photos (Unsplash License), verified by hand for the date-night mood.
@@ -42,11 +44,15 @@ const BACKGROUNDS = {
   still:   { label: 'Tĩnh vật', id: '1755401679272-c2e026885af4' },
 };
 const unsplash = (id, w) => `https://images.unsplash.com/photo-${id}?w=${w}&q=70&auto=format&fit=crop`;
+// '' | preset key | https URL | "enc:https://…" (encrypted upload, resolve with imageSrc()).
 function bgUrl(bg, w) {
   if (!bg) return '';
   if (BACKGROUNDS[bg]) return unsplash(BACKGROUNDS[bg].id, w);
-  const u = safeUrl(bg);
-  return /^https?:/.test(u) ? u : '';
+  return httpsSrc(bg);
+}
+function httpsSrc(s) {
+  const enc = String(s || '').startsWith('enc:'), u = safeUrl(enc ? s.slice(4) : s);
+  return /^https:/.test(u) ? (enc ? 'enc:' : '') + u : '';
 }
 const BLUR_MAX_PX = 24;
 
@@ -97,20 +103,68 @@ function repoFromLocation() {
   return m && location.pathname.split('/')[1] ? `${m[1]}/${location.pathname.split('/')[1]}` : '';
 }
 
-// Config source: #hash (admin preview) > config.json via GitHub API (fresh ~60s)
-// > config.json on Pages (CDN may be up to 10 min stale) > defaults.
+// ---- Encryption: config.json and uploaded photos are AES-GCM encrypted in the (public) repo. ----
+// The 256-bit key travels only in the link fragment (#k=…), which browsers never send to a server.
+// The owner's browser also keeps it in localStorage (same origin as the invite).
+const KEY_LS = 'invite-key';
+const hashKey = () => location.hash.match(/(?:^#|&)k=([\w-]{43})(?:&|$)/)?.[1] || '';
+const storedKey = () => { try { return localStorage.getItem(KEY_LS) || ''; } catch { return ''; } };
+const currentKey = () => hashKey() || storedKey();
+const newKey = () => b64u.enc(crypto.getRandomValues(new Uint8Array(32)));
+const aesKey = k => crypto.subtle.importKey('raw', b64u.dec(k), 'AES-GCM', false, ['encrypt', 'decrypt']);
+async function seal(k, bytes) { // -> iv(12) ‖ ciphertext
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(k), bytes));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return out;
+}
+async function unseal(k, buf) {
+  buf = new Uint8Array(buf);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, await aesKey(k), buf.slice(12)));
+}
+const encryptConfig = async (obj, k) => ({ v: 1, enc: b64u.enc(await seal(k, new TextEncoder().encode(JSON.stringify(obj)))) });
+// Plain JSON passes through (configs saved before encryption). Throws {locked} when the key is missing/wrong.
+async function openConfig(j, k = currentKey()) {
+  if (!j?.enc) return j || {};
+  const locked = () => Object.assign(new Error('locked'), { locked: true });
+  if (!k) throw locked();
+  try { return JSON.parse(new TextDecoder().decode(await unseal(k, b64u.dec(j.enc)))); } catch { throw locked(); }
+}
+// Encrypted photo references: "enc:https://raw.githubusercontent.com/…/uploads/x.bin" -> blob: URL (cached).
+const encCache = new Map();
+function imageSrc(src) {
+  if (!src?.startsWith('enc:')) return Promise.resolve(src || '');
+  if (!encCache.has(src)) encCache.set(src, (async () => {
+    const r = await fetch(src.slice(4));
+    if (!r.ok) throw new Error(r.status);
+    return URL.createObjectURL(new Blob([await unseal(currentKey(), await r.arrayBuffer())]));
+  })().catch(() => ''));
+  return encCache.get(src);
+}
+const hydrateImages = root => root.querySelectorAll('img[data-src]').forEach(async im => { im.src = await imageSrc(im.dataset.src); });
+
+// Config source: #hash (admin preview, packed JSON) > config.json via GitHub API (fresh ~60s)
+// > config.json on Pages (CDN may be up to 10 min stale) > defaults. Encrypted without key -> { locked: true }.
 async function readConfig(localUrl) {
   const D = structuredClone(DEFAULT), h = location.hash.slice(1);
-  if (h) try { return { ...D, ...(await unpack(h)) }; } catch {}
+  if (h && !/^k=/.test(h)) try { return { ...D, ...(await unpack(h)), preview: true }; } catch {}
   const repo = repoFromLocation();
   for (const url of [repo && `https://api.github.com/repos/${repo}/contents/config.json`, localUrl]) {
     if (!url) continue;
     try {
       const r = await fetch(url, { headers: { Accept: 'application/vnd.github.raw+json' } });
-      if (r.ok) return { ...D, ...(await r.json()) };
-    } catch {}
+      if (r.ok) return { ...D, ...(await openConfig(await r.json())) };
+    } catch (e) { if (e.locked) return { ...D, locked: true }; }
   }
   return D;
+}
+
+// ---- Email notifications via the owner's Google Apps Script web app (docs/notifications.md) ----
+// Only Apps Script URLs are accepted. "no-cors" + text/plain = simple request: no preflight, opaque reply.
+const notifyEndpoint = u => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u || '') ? u : '';
+function sendNotify(url, c) {
+  const body = JSON.stringify({ event: c.event, to: c.to, from: c.from, accept: c.accept, date: c.date,
+    at: new Date().toLocaleString('vi-VN'), ua: navigator.userAgent });
+  return fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true, body }).catch(() => {});
 }
 
 // ---- Date parts (shared by the template layout and free-layout fields) ----
@@ -142,7 +196,7 @@ const FIELDS = {
   date:     ['Ngày', c => { const p = dateParts(c.date); return p.valid ? `${p.dd} · ${p.mm} · ${p.yyyy}` : ''; }],
   when:     ['Thứ & giờ', c => { const p = dateParts(c.date); return p.valid ? `${p.weekday}, ${p.time}` : ''; }],
 };
-const ALIGN = ['left', 'center', 'right'], COLORS = ['fg', 'muted', 'accent'];
+const ALIGN = ['left', 'center', 'right'], COLORS = ['fg', 'muted', 'accent'], SHAPES = ['line', 'frame', 'circle'];
 
 // Starting point when the user first switches to "Tự thiết kế": mirrors the template letter.
 function defaultPortrait() {
@@ -161,17 +215,24 @@ function itemText(cfg, it) { return it.type === 'field' ? (FIELDS[it.field]?.[1]
 // Inline style from an item. Every value is coerced/whitelisted (config is user data).
 function itemStyle(it, z) {
   return `--cx:${num(it.cx, -50, 150, 50)};--cy:${num(it.cy, -50, 150, 50)};--w:${num(it.w, 4, 4000, 200)};` +
+    `--h:${num(it.h, 1, 4000, 100)};--t:${num(it.t, .5, 40, 1)};--rad:${num(it.rad, 0, 2000, 0)};` +
     `--fs:${num(it.fs, 4, 800, 16)};--rot:${num(it.rot, -360, 360, 0)};--op:${num(it.op ?? 100, 0, 100, 100) / 100};z-index:${z};` +
     `text-align:${ALIGN.includes(it.align) ? it.align : 'center'};color:var(--${COLORS.includes(it.color) ? it.color : 'fg'});` +
     `font-family:var(--${it.font === 'body' ? 'body' : 'display'});font-style:${it.italic ? 'italic' : 'normal'};` +
     `text-transform:${it.caps ? 'uppercase' : 'none'};letter-spacing:${num(it.ls, -.1, 1, 0)}em;line-height:${num(it.lh, .8, 3, 1.25)}`;
 }
 // Items HTML in reading order (top→bottom, left→right) for accessibility; z-index keeps layer order.
-// opts.fmt(text) -> inner HTML (escaped!). opts.reveal adds the word-by-word reveal hooks.
+// opts.fmt(text) -> inner HTML (escaped!). opts.reveal adds the reveal hooks (word-by-word for text).
+// Images render with data-src: call hydrateImages(root) afterwards (decrypts "enc:" photos).
 function boardItemsHTML(cfg, items, { fmt = esc, reveal = false } = {}) {
   return items.map((it, z) => [it, z]).sort((a, b) => a[0].cy - b[0].cy || a[0].cx - b[0].cx)
-    .map(([it, z], i) => `<div class="it" data-id="${esc(it.id)}" style="${itemStyle(it, z)}">` +
-      `<div class="tx${reveal ? ' words' : ''}"${reveal ? ` data-r style="--d:${i + 1}"` : ''}>${fmt(itemText(cfg, it))}</div></div>`).join('');
+    .map(([it, z], i) => {
+      const r = reveal ? ` data-r style="--d:${i + 1}"` : '';
+      const inner = it.type === 'image' ? `<img class="im" data-src="${esc(httpsSrc(it.src))}" alt="" draggable="false"${r}>`
+        : it.type === 'shape' ? `<i class="sh ${SHAPES.includes(it.shape) ? it.shape : 'line'}"${r}></i>`
+        : `<div class="tx${reveal ? ' words' : ''}"${r}>${fmt(itemText(cfg, it))}</div>`;
+      return `<div class="it it-${esc(it.type || 'text')}" data-id="${esc(it.id)}" style="${itemStyle(it, z)}">${inner}</div>`;
+    }).join('');
 }
 const freeLayout = cfg => cfg.layout?.mode === 'free' && cfg.layout.portrait?.items?.length ? cfg.layout : null;
 
@@ -206,6 +267,8 @@ function applyBackground(cfg, r) {
   r.setProperty('--bgz', num(cfg.bgZoom, 100, 300, 100) / 100);
   document.documentElement.classList.toggle('has-bg', !!url);
   if (!url) { r.removeProperty('--bg-img'); return Promise.resolve(); }
-  const img = new Image(); img.src = url;
-  return img.decode().catch(() => {}).then(() => r.setProperty('--bg-img', `url("${url}")`));
+  return imageSrc(url).then(src => {
+    const img = new Image(); img.src = src;
+    return img.decode().catch(() => {}).then(() => r.setProperty('--bg-img', `url("${src}")`));
+  });
 }

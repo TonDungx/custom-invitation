@@ -30,7 +30,7 @@ Mở `https://tondungx.github.io/custom-invitation/admin`. Gõ `/admin` hay `/ad
 |---|---|
 | Chấm và chữ trạng thái | **Đã lưu** (chấm xanh): form khớp bản đã lưu. **Chưa lưu** (chấm vàng): có thay đổi. **Đang lưu…**. **Lỗi khi lưu** (đỏ). |
 | Mở trang | Mở link thiệp **đã lưu** trong tab mới (không phải bản đang sửa). |
-| Sao chép link | Chép `https://tondungx.github.io/custom-invitation/`. Nếu còn thay đổi chưa lưu, thông báo sẽ nhắc bấm Áp dụng. |
+| Sao chép link | Chép link thiệp **kèm mã khoá** `…/custom-invitation/#k=…`. Chỉ ai có đúng link này mới xem được nội dung. Nếu còn thay đổi chưa lưu, thông báo sẽ nhắc bấm Áp dụng. |
 | Áp dụng | Lưu vào `config.json` trong repo. Chỉ bấm được khi có thay đổi. Phím tắt: **Ctrl+S** (Mac: **Cmd+S**). |
 
 Đóng hoặc tải lại trang khi còn thay đổi chưa lưu thì trình duyệt sẽ hỏi xác nhận.
@@ -57,7 +57,8 @@ Mở bằng nút **Mở trình thiết kế ↗**, hoặc vào thẳng `https://
 | Nút | Chức năng |
 |---|---|
 | Dọc / Ngang | Chuyển giữa bản cho điện thoại (390×844) và bản cho laptop, PC (1440×900). Mỗi bản lấp đầy màn hình người xem. |
-| + Thêm… | Thêm khối thông tin (Lời chào, Tên người nhận, Tiêu đề, Lời nhắn, Chữ ký, Ngày, Thứ & giờ) hoặc Chữ tự do, đặt ở giữa trang |
+| + Thêm… | Thêm khối thông tin (Lời chào, Tên người nhận, Tiêu đề, Lời nhắn, Chữ ký, Ngày, Thứ & giờ), Chữ tự do, **Ảnh…** (chọn file, nén và mã hoá rồi tải lên), **Đường kẻ**, **Khung**, **Vòng tròn** |
+| Bố cục mẫu… | **Cổ điển · đối xứng**, **Tạp chí · lệch trái** (lề trái 8%, chữ ký ở một phần ba bên phải), **Tỷ lệ vàng · có khung** (tiêu đề và lời nhắn ở đường 38.2% / 61.8%). Thay toàn bộ bản đang mở, hoàn tác được. |
 | ⅓ | Lưới một phần ba (xanh), bật mặc định |
 | φ | Đường tỷ lệ vàng 38.2% / 61.8% (vàng) |
 | Lề | Lề an toàn 8% (đỏ nhạt), bật mặc định. Nên giữ chữ bên trong lề. |
@@ -65,7 +66,7 @@ Mở bằng nút **Mở trình thiết kế ↗**, hoặc vào thẳng `https://
 
 **Thao tác trên trang:**
 - **Kéo phần tử** để di chuyển. Phần tử tự hít (trong 6px) vào: đường tâm, các đường gióng đang bật, mép trái, tâm, mép phải, mép trên, mép dưới của phần tử khác. Vạch hồng hiện ra khi hít. **Giữ Alt** để kéo tự do.
-- **Tay nắm hai bên:** đổi bề ngang, mép đối diện đứng yên.
+- **Tay nắm hai bên:** đổi bề ngang, mép đối diện đứng yên. Ảnh và khung có thêm **tay nắm trên/dưới** để đổi chiều cao. Đường kẻ chỉ có tay nắm hai bên. Vòng tròn chỉ có 4 góc (giữ tròn).
 - **Tay nắm 4 góc:** phóng to, thu nhỏ cả cỡ chữ lẫn bề ngang quanh tâm.
 - **Chấm tròn phía trên:** xoay. Tự hít vào 0°, ±90°, ±180° (trong 3°). **Giữ Shift** để xoay theo bước 15°.
 - **Bàn phím** (khi trang thiết kế đang được chọn): mũi tên dịch 0.5% (Shift: 5%), Delete xoá, Ctrl+D nhân bản, Esc bỏ chọn.
@@ -104,6 +105,7 @@ Mỗi điểm đến là một thẻ:
   | Bốc hơi | Bấm một lần là tan thành bụi |
   | Ẩn nút | Chỉ có nút đồng ý |
 
+- **Thông báo qua email:** dán link Web App của Google Apps Script, tuỳ chọn **Báo cả khi người ấy mở thiệp**, bấm **Gửi thử** để kiểm tra. Hướng dẫn cài: [notifications.md](notifications.md).
 - **Link nhắn lại:** hiện thành nút sau khi người ấy bấm đồng ý. Ví dụ `https://m.me/<username>` (Messenger), link Zalo, `sms:0901234567`. Để trống thì ẩn.
 - **Chữ trên nút nhắn.**
 
@@ -121,6 +123,15 @@ Mỗi điểm đến là một thẻ:
 - **Điểm lấy nét:** kéo chấm trên ảnh nhỏ tới phần ảnh muốn giữ khi màn hình cắt bớt ảnh (ví dụ ngọn nến).
 - **Phóng to (100–300%):** phóng ảnh quanh điểm lấy nét.
 - Các thanh trượt và điểm lấy nét bị khoá khi chọn "Không".
+- **Dọn ảnh không dùng:** liệt kê `uploads/` trên GitHub, giữ lại ảnh mà config đã lưu hoặc form đang sửa còn dùng (ảnh nền, ảnh trong trang thiết kế), hỏi xác nhận rồi xoá phần còn lại (mỗi ảnh 1 commit). Có ảnh mới ở trang Thiết kế chưa Áp dụng thì Áp dụng ở đó trước. File đã xoá vẫn còn trong lịch sử git.
+
+## Mã khoá (riêng tư)
+
+- Nội dung thiệp và ảnh tải lên được **mã hoá** trước khi lưu vào repo. Ai mở repo chỉ thấy dữ liệu không đọc được.
+- Khoá tạo tự động lần đầu và lưu trong trình duyệt của bạn. Nó nằm trong link mà **Sao chép link** tạo ra (đoạn `#k=…`).
+- **Mở admin ở máy hoặc trình duyệt khác:** admin hỏi **"Mở khoá thiệp"**. Dán link thiệp đầy đủ đã gửi (hoặc phần mã sau `k=`).
+- **Mất cả khoá lẫn link:** không đọc lại được nội dung cũ. Nhập lại nội dung rồi Áp dụng, thiệp sẽ dùng khoá mới. Link cũ đã gửi sẽ không mở được nữa.
+- **Chưa mở khoá** thì nút Áp dụng bị khoá, để không ghi đè nội dung thật bằng nội dung mặc định.
 
 ## Kết nối GitHub (lần đầu)
 

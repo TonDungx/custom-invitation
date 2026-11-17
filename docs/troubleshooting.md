@@ -2,6 +2,11 @@
 
 | Triệu chứng | Nguyên nhân có thể | Cách xử lý |
 |---|---|---|
+| Thiệp hiện "Thiệp này cần link đầy đủ" | Link thiếu đoạn `#k=…`, hoặc bị cắt khi copy | Gửi lại link lấy từ nút **Sao chép link** trong admin |
+| Admin hỏi "Mở khoá thiệp" | Trình duyệt này chưa có khoá | Dán link thiệp đầy đủ đã gửi (có `#k=`) |
+| Admin báo "Chưa mở khoá", nút Áp dụng bị khoá | Đã huỷ hộp mở khoá | Tải lại trang và dán link đầy đủ |
+| Không nhận được mail thông báo | Chưa deploy, link sai, chưa Áp dụng sau khi dán link, mail vào Spam, script sửa mà chưa deploy bản mới | Làm lại theo [notifications.md](notifications.md); dùng nút **Gửi thử** |
+| Dán link vào Messenger không thấy ảnh xem trước | Messenger cache ảnh cũ của link | Chờ cache hết hạn, hoặc dùng Sharing Debugger của Facebook để làm mới [Unverified] |
 | Đã bấm Áp dụng nhưng link thiệp vẫn hiện nội dung cũ | Cache: API khoảng 60s; nếu bị giới hạn request thì rơi xuống Pages, cache tới 10 phút | Chờ 1–10 phút. Kiểm tra commit `chore: update invitation` đã có trên GitHub. Kiểm tra trực tiếp: `curl -s https://api.github.com/repos/TonDungx/custom-invitation/contents/config.json -H "Accept: application/vnd.github.raw+json"` |
 | Admin báo "Token hoặc repo không đúng quyền" | Token hết hạn hoặc bị thu hồi, chưa chọn đúng repo, thiếu quyền Contents: Read and write, repo nhập sai | Tạo token mới theo [admin-guide.md](admin-guide.md#kết-nối-github-lần-đầu), bấm **Kết nối GitHub** để nhập lại |
 | Admin báo "Lỗi khi lưu (5xx)" hoặc lỗi mạng | GitHub gặp sự cố hoặc mất mạng | Thử lại. Thay đổi vẫn còn trong form miễn là chưa đóng tab. |

@@ -61,7 +61,7 @@ Không chế độ nào chuyển sang trạng thái đã đồng ý hay ghi nh�
 
 | Chế độ | Kích hoạt | Hành vi chi tiết |
 |---|---|---|
-| `dodge` (Né tránh) | Rê chuột vào (chỉ với chuột), chạm hoặc nhấn (`pointerdown`), bấm phím (`click`) | Chọn ngẫu nhiên một vị trí trong phần giao giữa section Hồi đáp và màn hình, cách mép 16px. Loại vị trí đè lên nút đồng ý hoặc câu hỏi (cộng thêm lề 16px) và vị trí cách chỗ cũ dưới 110px. Thử tối đa 40 lần. Di chuyển bằng `transform` với đường cong hơi nảy `cubic-bezier(.3, 1.35, .5, 1)` trong 0.6s. Trên điện thoại, nút nhảy đi ngay khi ngón tay chạm vào nên không kịp bấm. |
+| `dodge` (Né tránh) | Rê chuột vào (chỉ với chuột), chạm hoặc nhấn (`pointerdown`), bấm phím (`click` có `detail = 0`; click do chạm sinh ra bị bỏ qua để không né 2 lần) | Chọn ngẫu nhiên một vị trí trong phần giao giữa section Hồi đáp và màn hình, cách mép 16px. Loại vị trí đè lên nút đồng ý hoặc câu hỏi (cộng thêm lề 16px) và vị trí cách chỗ cũ dưới 110px. Thử tối đa 40 lần. Di chuyển bằng `transform` với đường cong hơi nảy `cubic-bezier(.3, 1.35, .5, 1)` trong 0.6s. Trên điện thoại, nút nhảy đi ngay khi ngón tay chạm vào nên không kịp bấm. |
 | `smoke` (Bốc khói) | `click` | Mỗi lần bấm: rung 380ms, nóng lên (`--heat = min(1, n/3)` trộn màu chữ và viền sang màu nhấn), bốc `3 + 4n` cụm khói. **Lần thứ 4:** thêm 26 cụm khói, nút mờ, nhoè và co lại (0.9s, trễ 0.25s) rồi bị xoá. Riêng nút này không có hiệu ứng tô nền khi rê chuột, để vẫn thấy màu "nóng". |
 | `vanish` (Bốc hơi) | `click` | 46 hạt bụi bay lên. Nút mờ dần, nhoè `blur(10px)`, bay lên 16px, chữ giãn ra trong 1.1s, rồi bị xoá. |
 | `off` | — | Không có nút. |
@@ -81,13 +81,23 @@ Tạo file `hen-ho.ics` (iCalendar 2.0) ngay trên máy và tải về:
 | `DESCRIPTION` | Các dòng `{time} {name}` |
 | `UID` | `{timestamp}@invite` |
 
-Không có nhắc nhở (`VALARM`). Mỗi thiết bị xử lý file khác nhau:
+Sau khi đồng ý có 2 nút lịch:
+- **Google Calendar:** link `calendar.google.com/calendar/render?action=TEMPLATE&…` mở trang tạo sự kiện đã điền sẵn. Không cần tải file, hợp với Android và PC.
+- **Lịch Apple / Outlook:** file `.ics` ở trên, có `VALARM` báo trước 2 giờ.
+- **Trong ứng dụng nhắn tin** (User-Agent có FBAN, FBAV, Instagram, Zalo, Line): hiện thêm dòng nhắc "Bấm ⋯ rồi chọn Mở bằng trình duyệt".
+
+Mỗi thiết bị xử lý file `.ics` khác nhau:
 - iPhone Safari: thường hiện ngay bảng "Thêm vào Lịch".
 - PC: tải file về, phải tự mở.
 - Android: tuỳ máy.
 - Trình duyệt trong Messenger hoặc Zalo: có thể chặn tải file.
 
 [Unverified] Cách xử lý theo từng thiết bị ở trên dựa trên hiểu biết chung, chưa thử trên máy thật.
+
+### Thông báo
+- Bấm Đồng ý thì gửi sự kiện `accept`.
+- Nếu bật `notifyOpen`: gửi sự kiện `open` khi mở thiệp, mỗi tab 1 lần (`sessionStorage`).
+- Không gửi khi config đến từ hash xem trước hoặc trang nằm trong iframe. Chi tiết: [notifications.md](notifications.md).
 
 ## 6. Footer
 "{from} & {to}" cỡ chữ nhỏ, có khoảng đệm cho tai thỏ (`env(safe-area-inset-bottom)`).
@@ -119,6 +129,11 @@ Vạch 2px màu nhấn ở mép trên, dài theo phần đã cuộn. Thuần CSS
   - Hiện khi cuộn, đứng yên 1.2s thì mờ đi.
   - Rê chuột vào thì hiện và rộng lên 6px. Kéo được (`setPointerCapture`).
   - Ẩn khi trang không đủ dài để cuộn hoặc khi phong thư đang khoá cuộn.
+
+## 7b. Khoá và xem trước khi gửi link
+- **Thiếu khoá** (config đã mã hoá, link không có `#k=`, trình duyệt không lưu khoá): chỉ hiện "Thiệp này cần link đầy đủ", **không** hiện nội dung mặc định.
+- **Ảnh xem trước (Open Graph):** thẻ meta tĩnh `og:title`, `og:description`, `og:image` (`og.jpg` 1200×630, nội dung chung chung). Ảnh này hiện khi dán link vào Messenger, Zalo, iMessage. Crawler không chạy JS, nên ảnh không phụ thuộc nội dung đã mã hoá.
+- **Gợi ý "Cuộn xuống"** không hiện nếu sẽ đè lên chữ hoặc ảnh của màn đầu (màn thấp như iPhone SE).
 
 ## 8. Chuyển động giảm (`prefers-reduced-motion: reduce`)
 - Mọi transition còn 0.01ms, không có độ trễ: nội dung hiện ngay.

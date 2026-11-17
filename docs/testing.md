@@ -82,6 +82,14 @@ Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã c
 | Điện thoại 390×844: bản dọc phủ kín, tâm phần tử đúng (cx%, cy%) trong 2px | Hiển thị |
 | Laptop 1280×800: hiện bản ngang | Chọn bản theo hướng |
 | Laptop khi chưa có bản ngang: bản dọc ở giữa, tỷ lệ 390:844 | Dự phòng |
+| `config.json` lưu dạng `{v, enc}`, không chứa chữ "Linh"; giải mã bằng khoá trong `localStorage` ra đúng nội dung | Mã hoá khi lưu |
+| Ảnh tải lên là `uploads/*.bin`, không còn chữ ký `WEBP`, giải mã ra ảnh 2400×1600; link `enc:https://raw…/c0ffee/…` | Mã hoá ảnh |
+| Trình duyệt mới không có khoá: chỉ hiện "cần link đầy đủ", không có nội dung; mở với `#k=` thì đọc được | Riêng tư |
+| Gửi thử → sự kiện `test`; mở thiệp (bật notifyOpen) → đúng 1 `open`; Đồng ý → `accept` kèm tên và ngày; xem trước trong admin → 0 thông báo | Thông báo |
+| Link Google Calendar có đúng `dates`; `.ics` có `VALARM` −2 giờ; dòng nhắc chỉ hiện với User-Agent Messenger | Lịch |
+| `index.html` có `og:title`, `og:description`, `og:image`; `og.jpg` là JPEG | Ảnh xem trước khi gửi link |
+| 3 bố cục mẫu (6, 6, 7 phần tử), thêm vòng tròn (4 góc + xoay), đường kẻ (2 cạnh + xoay), ảnh (8 tay nắm + xoay, giải mã ra `blob:`), tay nắm dưới tăng chiều cao; lưu thành tham chiếu `enc:`; thiệp giải mã ảnh và vẽ khung | Trình thiết kế giai đoạn 2 |
+| Dọn ảnh: xoá ảnh mồ côi và ảnh nền chưa lưu, không bao giờ xoá ảnh config đang dùng | Dọn ảnh |
 | Không có `pageerror` nào ở mọi trang | Lỗi runtime |
 
 Các chế độ smoke, vanish, off được nạp bằng hash: gọi `pack({...DEFAULT, declineMode})` ngay trong trang admin, giống cách khung xem trước làm.
@@ -92,8 +100,38 @@ Các chế độ smoke, vanish, off được nạp bằng hash: gọi `pack({...
 - **Tương phản theme:** tính theo công thức WCAG, xem bảng trong [design-system.md](design-system.md).
 - **Bản live:** sau mỗi lần deploy, mở trang thiệp và admin trên Pages, kiểm tra không có lỗi JS.
 
+## `check-devices.mjs`: giả lập thiết bị
+
+```bash
+npm i --no-save playwright-core && npx playwright@1.48.2 install webkit   # 1 lần
+node check-devices.mjs
+```
+Tạo một `config.json` đã mã hoá (bằng Node WebCrypto, cùng định dạng với `shared.js`) và mở trang thiệp bằng `#k=`. Chạy 6 cấu hình × 2 bố cục (mẫu, tự thiết kế):
+
+| Thiết bị | Engine |
+|---|---|
+| iPhone 13, iPhone SE (320×568), iPad Pro 11 ngang | WebKit (lõi của Safari) |
+| iPhone 13 với User-Agent Messenger | WebKit |
+| Pixel 7, Pixel 7 với User-Agent Zalo | Chrome |
+
+Kiểm tra trên mỗi máy:
+- Giải mã được bằng `#k`.
+- Không cuộn ngang; phần tử của bố cục tự do không tràn mép.
+- Gợi ý cuộn không đè chữ.
+- Chạm vào nút từ chối thì nó né.
+- Chạm Đồng ý thì chạy; có link Google Calendar.
+- Dòng nhắc "mở bằng trình duyệt" **chỉ** hiện trong ứng dụng.
+- Các nút không gãy dòng; không có lỗi JS.
+
+**Lỗi thật bộ này đã bắt được:**
+- Một lần chạm làm nút từ chối né 2 lần (sự kiện `pointerdown` rồi `click`), lần thứ hai đo vị trí lúc nút đang trượt dở nên có thể **đè lên nút Đồng ý**.
+- Trên iPhone SE, gợi ý cuộn đè lên chữ ký.
+- Nút "Lịch Apple / Outlook" gãy dòng.
+
+**Giới hạn:** WebKit của Playwright trên Windows không giống hệt Safari trên iPhone, và User-Agent giả không tái hiện được mọi hành vi của trình duyệt trong ứng dụng thật (chặn tải file, cookie…). Vẫn cần thử một lần trên máy thật.
+
 ## Chưa có kiểm tra tự động cho
-- Safari / iOS, Firefox (chỉ chạy Chrome).
+- Safari thật trên iPhone, Firefox (`check-devices.mjs` chỉ giả lập bằng WebKit và Chrome).
 - GitHub API thật (rate limit, token hết hạn).
 - Trình duyệt trong Messenger, Zalo.
 - Hiệu ứng View Transition và thanh tiến độ CSS (chỉ chạy trên trình duyệt hỗ trợ).

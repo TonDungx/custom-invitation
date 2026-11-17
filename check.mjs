@@ -21,14 +21,20 @@ const BASE = 'http://localhost:5178/';
 // Always in the future, so the countdown assertion never expires.
 const YEAR = new Date().getFullYear() + 1, DATE = `${YEAR}-12-24T19:30`;
 
-// Fake GitHub contents API (one file in memory).
+// Fake GitHub contents API: config.json + uploads/ in memory.
 let stored = null, puts = 0, uploaded = null;
+const files = new Map(), deleted = [];   // uploads/<name> -> bytes
 async function fakeGitHub(route) {
-  const req = route.request();
-  if (req.method() === 'PUT' && req.url().includes('/contents/uploads/')) {
+  const req = route.request(), url = req.url();
+  if (req.method() === 'PUT' && url.includes('/contents/uploads/')) {
     assert.equal(req.headers().authorization, 'Bearer test-token');
-    uploaded = { path: req.url().split('/contents/')[1], bytes: Buffer.from(JSON.parse(req.postData()).content, 'base64') };
+    uploaded = { path: url.split('/contents/')[1], bytes: Buffer.from(JSON.parse(req.postData()).content, 'base64') };
+    files.set(uploaded.path, uploaded.bytes);
     return route.fulfill({ status: 201, json: { content: { path: uploaded.path }, commit: { sha: 'c0ffee' } } });
+  }
+  if (req.method() === 'DELETE') { const p = url.split('/contents/')[1]; files.delete(p); deleted.push(p); return route.fulfill({ status: 200, json: {} }); }
+  if (url.endsWith('/contents/uploads')) {
+    return files.size ? route.fulfill({ status: 200, json: [...files.keys()].map(p => ({ type: 'file', path: p, sha: 's-' + p })) }) : route.fulfill({ status: 404, json: {} });
   }
   if (req.method() === 'PUT') {
     assert.equal(req.headers().authorization, 'Bearer test-token');
@@ -46,9 +52,20 @@ const ctx = await browser.newContext();
 await ctx.route('https://api.github.com/**', fakeGitHub);
 // On localhost there is no repo in the URL, so the invite falls back to ./config.json: serve the saved file there.
 await ctx.route(BASE + 'config.json', r => stored ? r.fulfill({ status: 200, body: stored, contentType: 'application/json' }) : r.fulfill({ status: 404 }));
+// Encrypted photos are served from raw.githubusercontent.com (pinned to the fake commit "c0ffee").
+await ctx.route('https://raw.githubusercontent.com/**', r => {
+  const p = r.request().url().split('/c0ffee/')[1];
+  return files.has(p) ? r.fulfill({ status: 200, body: files.get(p) }) : r.fulfill({ status: 404 });
+});
+// Notifications to the owner's Apps Script web app.
+const notes = [];
+await ctx.route('https://script.google.com/**', r => { notes.push(JSON.parse(r.request().postData())); return r.fulfill({ status: 200, body: 'ok' }); });
+const NOTIFY = 'https://script.google.com/macros/s/AKfyTEST_123/exec';
 const errors = [];
 const page = await ctx.newPage(); await page.setViewportSize({ width: 1440, height: 900 });
 page.on('pageerror', e => errors.push('admin: ' + e.message));
+// config.json is encrypted at rest: decrypt with the key the admin keeps in localStorage.
+const plain = () => page.evaluate(s => openConfig(JSON.parse(s), localStorage.getItem('invite-key')), stored);
 
 await page.goto(BASE + 'admin');
 await page.waitForSelector('#status:has-text("Đã lưu")');
@@ -66,6 +83,8 @@ await page.fill(s1 + '[data-k=address]', '12 Lý Thái Tổ, Hà Nội');
 await page.fill(s1 + '[data-k=facebook]', 'https://www.facebook.com/nhahangsen');
 await page.fill(s1 + '[data-k=instagram]', '@nhahangsen');
 await page.fill('[name=reply]', 'javascript:alert(1)');
+await page.fill('[name=notifyUrl]', NOTIFY);
+await page.check('[name=notifyOpen]');
 await page.check('[name=theme][value=noir]');
 await page.check('[name=bg][value=candles]', { force: true });
 assert.ok(!(await page.isDisabled('#bgOpts')), 'bg sliders enabled when a photo is chosen');
@@ -84,8 +103,16 @@ await page.fill('#ghf [name=token]', 'test-token');
 await page.click('#ghf button[value=ok]');
 await page.waitForSelector('#status:has-text("Đã lưu")');
 assert.equal(puts, 1);
-assert.equal(JSON.parse(stored).to, 'Linh');
-assert.deepEqual([JSON.parse(stored).bg, JSON.parse(stored).bgBlur, JSON.parse(stored).bgDim], ['candles', 50, 60]);
+assert.ok(JSON.parse(stored).enc && !stored.includes('Linh'), 'config.json is encrypted at rest');
+const s0 = await plain();
+assert.equal(s0.to, 'Linh');
+assert.deepEqual([s0.bg, s0.bgBlur, s0.bgDim, s0.notifyUrl], ['candles', 50, 60, NOTIFY]);
+const KEY = await page.evaluate(() => localStorage.getItem('invite-key'));
+assert.match(KEY, /^[\w-]{43}$/, '256-bit key in base64url');
+assert.equal(notes.length, 0, 'admin preview never sends notifications');
+// "Gửi thử" sends a test notification.
+await page.click('#notifyTest'); await page.waitForTimeout(300);
+assert.equal(notes.at(-1)?.event, 'test', 'test notification sent');
 assert.ok(await page.isDisabled('#apply'));
 
 // Upload a background from the device: 3000x2000 PNG -> resized to <=2400px WebP, committed, URL pinned to commit sha.
@@ -96,11 +123,16 @@ const png = Buffer.from(await page.evaluate(() => {
 }), 'base64');
 await page.setInputFiles('#file', { name: 'photo.png', mimeType: 'image/png', buffer: png });
 await page.waitForFunction(() => document.querySelector('[name=bgUrl]').value.includes('c0ffee'));
-assert.match(uploaded.path, /^uploads\/\d+\.webp$/);
+assert.match(uploaded.path, /^uploads\/\d+\.bin$/);
 assert.ok(uploaded.bytes.length < png.length, 'compressed smaller than original');
-const dims = await page.evaluate(async b64 => { const b = await createImageBitmap(await (await fetch('data:image/webp;base64,' + b64)).blob()); return [b.width, b.height]; }, uploaded.bytes.toString('base64'));
-assert.deepEqual(dims, [2400, 1600], 'resized to 2400px long edge');
-assert.equal(await page.inputValue('[name=bgUrl]'), `https://raw.githubusercontent.com/owner/repo/c0ffee/${uploaded.path}`);
+assert.notEqual(uploaded.bytes.subarray(8, 12).toString(), 'WEBP', 'uploaded photo is encrypted, not a readable WebP');
+const dims = await page.evaluate(async b64 => {
+  const plainBytes = await unseal(localStorage.getItem('invite-key'), Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
+  const b = await createImageBitmap(new Blob([plainBytes])); return [b.width, b.height];
+}, uploaded.bytes.toString('base64'));
+assert.deepEqual(dims, [2400, 1600], 'decrypts to a 2400px-long-edge image');
+assert.equal(await page.inputValue('[name=bgUrl]'), `enc:https://raw.githubusercontent.com/owner/repo/c0ffee/${uploaded.path}`);
+await page.waitForFunction(() => document.querySelector('#focalImg').src.startsWith('blob:'));
 assert.ok(await page.isChecked('[name=bg][value=custom]'));
 assert.ok(await page.isVisible('#bgCustom'));
 await page.waitForSelector('#status:has-text("Chưa lưu")');
@@ -112,6 +144,7 @@ m.on('pageerror', e => errors.push('invite: ' + e.message));
 await m.goto(BASE);
 await m.waitForSelector('body.ready'); await m.waitForTimeout(1200);
 assert.equal(await m.textContent('.cover h1'), 'Linh');
+assert.equal(notes.filter(n => n.event === 'open').length, 1, 'open notification (notifyOpen) sent once');
 const bgState = await m.evaluate(() => ({ has: document.documentElement.classList.contains('has-bg'),
   img: getComputedStyle(document.documentElement).getPropertyValue('--bg-img'), blur: getComputedStyle(document.querySelector('.backdrop'), '::before').filter }));
 assert.ok(bgState.has && bgState.img.includes('images.unsplash.com'), 'background photo applied');
@@ -142,7 +175,7 @@ await m2.screenshot({ path: OUT + '/end.png' }); await m2.close();
 
 assert.equal(await m.locator('.stop h3 script').count(), 0, 'XSS: no script element');
 assert.match(await m.textContent('.stop h3'), /<script>/);
-assert.equal(await m.locator('.done a.btn').count(), 0, 'javascript: link dropped');
+assert.equal(await m.locator('.done a.btn:not(#gcal)').count(), 0, 'javascript: link dropped');
 const hrefs = await m.$$eval('.stop:first-child .links a', a => a.map(x => x.href));
 assert.equal(hrefs.length, 3);
 assert.match(hrefs[0], /google\.com\/maps.*L%C3%BD/);
@@ -167,8 +200,17 @@ for (let i = 0; i < 6; i++) {
 await m.screenshot({ path: OUT + '/dodge.png' });
 assert.ok(!(await m.locator('#rsvp.yes').count()), 'decline did nothing');
 await m.click('#yes'); await m.waitForTimeout(2400);
+const acc = notes.find(n => n.event === 'accept');
+assert.ok(acc && acc.to === 'Linh' && acc.date === DATE, 'accept notification sent with name and date');
+// Calendar: Google Calendar link + .ics with a 2h reminder.
+const gcal = new URL(await m.getAttribute('#gcal', 'href'));
+assert.equal(gcal.hostname, 'calendar.google.com');
+assert.equal(gcal.searchParams.get('dates'), `${YEAR}1224T193000/${YEAR}1224T233000`);
+assert.equal(await m.locator('.inapp').count(), 0, 'no in-app hint in a normal browser');
 const dl = m.waitForEvent('download'); await m.click('#ics');
-assert.match(fs.readFileSync(await (await dl).path(), 'utf8'), new RegExp(`DTSTART:${YEAR}1224T193000`));
+const ics = fs.readFileSync(await (await dl).path(), 'utf8');
+assert.match(ics, new RegExp(`DTSTART:${YEAR}1224T193000`));
+assert.match(ics, /BEGIN:VALARM[\s\S]*TRIGGER:-PT2H/, '.ics has a 2h reminder');
 // Other decline modes, configured through the URL hash (same path the admin preview uses).
 for (const mode of ['smoke', 'vanish']) {
   const p = await ctx.newPage(); await p.setViewportSize({ width: 390, height: 844 });
@@ -275,9 +317,9 @@ assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
   await a.screenshot({ path: OUT + '/designer.png' });
   // Save and render on real screens.
   await a.click('#apply'); await a.waitForSelector('#status:has-text("Đã lưu")');
-  const saved = JSON.parse(stored).layout;
+  const saved = (await plain()).layout;
   assert.equal(saved.mode, 'free'); assert.equal(saved.portrait.items.length, 6); assert.equal(saved.landscape.items.length, 6);
-  assert.equal(JSON.parse(stored).to, 'Linh', 'designer save keeps the form fields');
+  assert.equal((await plain()).to, 'Linh', 'designer save keeps the form fields');
   // Preview opens the invite with the current design.
   const [pop] = await Promise.all([a.waitForEvent('popup'), a.click('#preview')]);
   await pop.waitForSelector('body.ready'); assert.ok(await pop.locator('.board-wrap').count(), 'preview shows the free layout'); await pop.close();
@@ -286,7 +328,7 @@ assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
   const fm = await ctx.newPage(); await fm.goto(BASE + 'admin/'); await fm.waitForSelector('#status:has-text("Đã lưu")');
   await fm.fill('[name=to]', 'Linh2'); await fm.waitForSelector('#status:has-text("Chưa lưu")');
   await fm.click('#apply'); await fm.waitForSelector('#status:has-text("Đã lưu")');
-  const merged = JSON.parse(stored);
+  const merged = await plain();
   assert.equal(merged.to, 'Linh2'); assert.equal(merged.layout.portrait.items.length, 6, 'form save keeps the design');
   assert.equal(merged.layout.mode, 'free');
   await fm.fill('[name=to]', 'Linh'); await fm.click('#apply'); await fm.waitForSelector('#status:has-text("Đã lưu")');
@@ -319,6 +361,87 @@ assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
   const fb = await v.locator('.board[data-o=portrait]').boundingBox();
   assert.ok(Math.abs(fb.width / fb.height - 390 / 844) < .01 && Math.abs(fb.x + fb.width / 2 - 640) < 2, 'portrait fallback centred at 390:844');
   await v.close();
+}
+
+// ---------- Privacy: without the key the invite shows nothing ----------
+{
+  const c2 = await browser.newContext(); // fresh browser: no key in localStorage
+  await c2.route('https://api.github.com/**', fakeGitHub);
+  await c2.route(BASE + 'config.json', r => r.fulfill({ status: 200, body: stored, contentType: 'application/json' }));
+  const v = await c2.newPage(); v.on('pageerror', e => errors.push('locked: ' + e.message));
+  await v.goto(BASE); await v.waitForSelector('body.ready');
+  assert.ok(await v.isVisible('.locked-msg'), 'no key -> locked message');
+  assert.ok(!(await v.content()).includes('Linh'), 'no content without the key');
+  await v.goto(BASE + '#k=' + KEY); await v.reload(); await v.waitForSelector('.cover h1');
+  assert.equal(await v.textContent('.cover h1'), 'Linh', 'link with #k= decrypts');
+  // Messenger / Zalo in-app browser: hint to open in the real browser.
+  const ia = await browser.newContext({ userAgent: 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/MessengerForiOS;FBAV/450.0]' });
+  await ia.route('https://api.github.com/**', fakeGitHub);
+  await ia.route(BASE + 'config.json', r => r.fulfill({ status: 200, body: stored, contentType: 'application/json' }));
+  await ia.route('https://script.google.com/**', r => r.fulfill({ status: 200, body: 'ok' }));
+  const w = await ia.newPage(); await w.goto(BASE + '#k=' + KEY); await w.waitForSelector('#open'); await w.click('#open');
+  await w.locator('#rsvp').scrollIntoViewIfNeeded(); await w.waitForTimeout(1500); await w.click('#yes');
+  assert.ok(await w.isVisible('.inapp'), 'in-app browser hint shown');
+  await c2.close(); await ia.close();
+}
+
+// ---------- Link preview (Open Graph) ----------
+{
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  for (const k of ['og:title', 'og:description', 'og:image']) assert.ok(html.includes(`property="${k}"`), k);
+  const og = fs.readFileSync(path.join(ROOT, 'og.jpg'));
+  assert.ok(og[0] === 0xFF && og[1] === 0xD8, 'og.jpg is a JPEG');
+}
+
+// ---------- Designer P2: shapes, presets, encrypted photo ----------
+{
+  const a = await ctx.newPage(); await a.setViewportSize({ width: 1440, height: 900 });
+  a.on('pageerror', e => errors.push('designer2: ' + e.message)); a.on('dialog', d => d.accept());
+  await a.goto(BASE + 'admin/design/'); await a.waitForSelector('.ed-stage .board .it');
+  for (const [k, n] of [['classic', 6], ['editorial', 6], ['golden', 7]]) {
+    await a.selectOption('.ed-preset', k);
+    assert.equal(await a.locator('.board .it').count(), n, 'preset ' + k);
+  }
+  assert.equal(await a.locator('.board .it-shape .sh.frame').count(), 1, 'golden preset has a frame');
+  await a.selectOption('.ed-add', 'shape:circle');
+  assert.equal(await a.locator('.board .sh.circle').count(), 1, 'circle added');
+  assert.equal(await a.locator('.ed-sel b[data-h]').count(), 5, 'circle: 4 corners + rotate');
+  await a.selectOption('.ed-add', 'shape:line');
+  assert.equal(await a.locator('.ed-sel b[data-h]').count(), 3, 'line: 2 sides + rotate');
+  // Photo item: uploaded encrypted, rendered decrypted.
+  const [chooser] = await Promise.all([a.waitForEvent('filechooser'), a.selectOption('.ed-add', 'image')]);
+  await chooser.setFiles({ name: 'p.png', mimeType: 'image/png', buffer: png });
+  await a.waitForFunction(() => document.querySelector('.board .it-image img')?.src.startsWith('blob:'));
+  assert.ok(await a.evaluate(() => document.querySelector('.board .it-image img').naturalWidth) > 0, 'decrypted photo renders');
+  assert.equal(await a.locator('.ed-sel b[data-h]').count(), 9, 'photo: 8 handles + rotate');
+  // Bottom handle changes height only.
+  const hb = await a.locator('.ed-sel b[data-h=s]').boundingBox(), h0 = await a.evaluate(() => +document.querySelector('.board .it-image').style.getPropertyValue('--h'));
+  await a.mouse.move(hb.x + 5, hb.y + 3); await a.mouse.down(); await a.mouse.move(hb.x + 5, hb.y + 43, { steps: 5 }); await a.mouse.up();
+  assert.ok(await a.evaluate(() => +document.querySelector('.board .it-image').style.getPropertyValue('--h')) > h0, 'bottom handle grows height');
+  await a.click('#apply'); await a.waitForSelector('#status:has-text("Đã lưu")');
+  const lay = (await plain()).layout.portrait.items;
+  assert.ok(lay.some(i => i.type === 'image' && i.src.startsWith('enc:https://raw.githubusercontent.com/')), 'photo saved as encrypted reference');
+  await a.close();
+  // The invite renders the photo (decrypted) and the shapes.
+  const v = await ctx.newPage(); await v.setViewportSize({ width: 390, height: 844 });
+  await v.goto(BASE); await v.waitForSelector('body.ready'); await v.click('#open'); await v.waitForTimeout(2500);
+  assert.ok(await v.evaluate(() => document.querySelector('.board .it-image img')?.src.startsWith('blob:')), 'invite decrypts the photo');
+  assert.ok(await v.locator('.board .sh.frame').count(), 'invite draws the frame');
+  await v.screenshot({ path: OUT + '/p2-phone.png' }); await v.close();
+}
+
+// ---------- Clean unused uploads ----------
+{
+  files.set('uploads/999.bin', Buffer.from('orphan'));
+  const before = [...files.keys()];
+  const a = await ctx.newPage(); a.on('dialog', d => d.accept());
+  await a.goto(BASE + 'admin/'); await a.waitForSelector('#status:has-text("Đã lưu")');
+  await a.click('#clean'); await a.waitForTimeout(800);
+  const used = JSON.stringify(await plain());
+  assert.ok(deleted.includes('uploads/999.bin'), 'orphan deleted');
+  assert.ok(deleted.every(p => !used.includes(p)), 'never deletes a photo the config uses');
+  console.log('cleanup:', before.length, 'files ->', files.size, 'kept, deleted', deleted);
+  await a.close();
 }
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'all checks passed, no JS errors');

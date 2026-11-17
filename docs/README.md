@@ -4,7 +4,7 @@ Trang web thiệp mời hẹn hò dùng được nhiều lần, chỉnh sửa qu
 
 | | Link |
 |---|---|
-| Trang thiệp (link gửi đi) | https://tondungx.github.io/custom-invitation/ |
+| Trang thiệp (link gửi đi) | `https://tondungx.github.io/custom-invitation/#k=<mã khoá>`, lấy bằng nút **Sao chép link** trong admin |
 | Trang cấu hình (form) | https://tondungx.github.io/custom-invitation/admin |
 | Trang thiết kế (kéo thả) | https://tondungx.github.io/custom-invitation/admin/design |
 | Mã nguồn | https://github.com/TonDungx/custom-invitation |
@@ -21,6 +21,7 @@ Trang web thiệp mời hẹn hò dùng được nhiều lần, chỉnh sửa qu
 | [deployment-and-ops.md](deployment-and-ops.md) | GitHub Pages, cache (số liệu đo thật), commit từ admin, quy trình push, dọn ảnh | Deploy, push code, vận hành |
 | [testing.md](testing.md) | `check.mjs`: cách chạy, từng nhóm kiểm tra, cách giả lập GitHub API | Trước khi báo "xong" một thay đổi |
 | [decisions-and-limitations.md](decisions-and-limitations.md) | Các quyết định kiến trúc và lý do, giới hạn đã biết, lịch sử lỗi và bài học, ý tưởng tiếp theo | Trước khi đề xuất thay đổi lớn |
+| [notifications.md](notifications.md) | Cài thông báo email bằng Google Apps Script (từng bước) | Muốn biết khi người ấy mở thiệp, bấm Đồng ý |
 | [troubleshooting.md](troubleshooting.md) | Triệu chứng, nguyên nhân, cách xử lý | Khi có lỗi |
 
 ## Bắt đầu nhanh
@@ -51,9 +52,12 @@ custom-invitation/
 ├── shared.js          Dùng chung: mặc định, theme, font, ảnh nền, URL helper, đọc config, áp style, mô hình bố cục tự do
 ├── board.css          Style trang thiết kế tự do, dùng chung cho trang thiệp và trình chỉnh sửa (WYSIWYG)
 ├── admin/editor.js    Thành phần trình thiết kế (dùng trong admin/design)
-├── config.json        Cấu hình đã lưu (do admin ghi qua GitHub API, KHÔNG sửa tay khi admin đang mở)
-├── uploads/           Ảnh nền tải từ máy (do admin ghi)
+├── config.json        Cấu hình đã lưu, **mã hoá AES-GCM** (do admin ghi qua GitHub API, không sửa tay)
+├── uploads/           Ảnh tải từ máy, **mã hoá** (*.bin; vài *.webp cũ chưa mã hoá)
+├── og.jpg             Ảnh xem trước khi gửi link (Open Graph, 1200×630)
+├── tools/notify.gs    Script Google Apps Script gửi email thông báo (deploy ở tài khoản Google của bạn)
 ├── check.mjs          Kiểm thử end-to-end (Playwright + Chrome)
+├── check-devices.mjs  Kiểm thử giả lập thiết bị: iPhone (WebKit), Android, iPad, Messenger, Zalo
 ├── docs/              Tài liệu này
 └── .gitignore         node_modules/
 ```
@@ -61,6 +65,8 @@ custom-invitation/
 ## Tóm tắt kỹ thuật
 
 - **Không có backend.** Admin ghi `config.json` và ảnh vào repo qua GitHub REST API (contents), dùng fine-grained token lưu trong `localStorage` của trình duyệt.
+- **Riêng tư:** nội dung và ảnh được mã hoá AES-GCM 256-bit trước khi lưu vào repo public. Khoá chỉ nằm trong link gửi đi (`#k=…`, không bao giờ gửi lên server) và trong trình duyệt của bạn.
+- **Thông báo:** email qua Google Apps Script của chính bạn ([notifications.md](notifications.md)).
 - **Trang thiệp đọc cấu hình** theo thứ tự: hash trong URL (chỉ dùng cho xem trước) → GitHub API (mới, cache khoảng 60s) → `config.json` trên Pages (CDN cache 10 phút) → mặc định.
 - **Hiệu năng:** chỉ animate `opacity`, `transform`, `filter`. Không thư viện. Ảnh nền resize theo màn hình. Font tải 1 request. CLS đo được bằng 0.
 - **An toàn:** mọi chuỗi người dùng nhập đều được escape. Link chỉ chấp nhận `http`, `https`, `sms`, `tel`, `mailto`.

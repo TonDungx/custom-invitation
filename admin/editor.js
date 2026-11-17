@@ -1,8 +1,31 @@
 // Free-layout editor ("Tự thiết kế") for the admin. Pointer Events only, no dependencies.
 // Renders with boardItemsHTML() + board.css from the invite, so the canvas is WYSIWYG.
-// Usage: const ed = createEditor({ mount, getCfg, onChange }); ed.set(layout); ed.get(); ed.refresh();
+// Usage: const ed = createEditor({ mount, getCfg, onChange, upload }); ed.set(layout); ed.get(); ed.refresh();
+// upload(file) -> Promise<src|null> stores a photo (admin/common.js uploadImage: resized + encrypted).
 
-function createEditor({ mount, getCfg, onChange }) {
+// One-click starting layouts (portrait, design px of 390×844), built on the composition guides.
+const PRESETS = (() => {
+  const T = (field, cx, cy, w, fs, o = {}) => ({ type: 'field', field, cx, cy, w, fs, rot: 0, font: 'display', align: 'center', color: 'fg', lh: 1.25, ...o });
+  const cap = { font: 'body', caps: true, ls: .28, color: 'muted' };
+  const S = (shape, cx, cy, w, o = {}) => ({ type: 'shape', shape, cx, cy, w, h: 40, t: 1, rot: 0, color: 'accent', ...o });
+  return {
+    classic: { label: 'Cổ điển · đối xứng', items: [
+      T('greeting', 50, 20, 320, 12, cap), S('line', 50, 25.5, 40),
+      T('title', 50, 34, 330, 46, { lh: 1.08 }), T('message', 50, 52, 300, 16, { font: 'body', color: 'muted', lh: 1.75 }),
+      T('sign', 50, 66, 300, 26, { italic: true }), T('date', 50, 78, 300, 12, cap)] },
+    editorial: { label: 'Tạp chí · lệch trái', items: [ // left edge on the 8% safe margin, signature on the right third
+      T('greeting', 46.5, 16, 300, 12, { ...cap, align: 'left' }), T('title', 49, 30, 320, 67.8, { align: 'left', lh: 1 }),
+      S('line', 15.7, 44, 60), T('message', 43.9, 56, 280, 16, { font: 'body', color: 'muted', lh: 1.75, align: 'left' }),
+      T('sign', 53.5, 74, 300, 25.9, { italic: true, align: 'right' }), T('date', 53.5, 80, 300, 12, { ...cap, align: 'right' })] },
+    golden: { label: 'Tỷ lệ vàng · có khung', items: [ // title and message on the 38.2% / 61.8% lines
+      S('frame', 50, 50, 342, { h: 760, op: 60 }), T('greeting', 50, 20, 300, 12, cap),
+      T('title', 50, 38.2, 300, 41.9, { lh: 1.1 }), S('line', 50, 48, 40),
+      T('message', 50, 61.8, 280, 16, { font: 'body', color: 'muted', lh: 1.75 }),
+      T('sign', 50, 76, 300, 25.9, { italic: true }), T('date', 50, 84, 300, 9.9, { ...cap, ls: .3 })] },
+  };
+})();
+
+function createEditor({ mount, getCfg, onChange, upload }) {
   let layout = { portrait: null, landscape: null }, orient = 'portrait', selId = null;
   let show = { thirds: true, golden: false, safe: true }, ratio = 1.618;
   const undo = [], redo = [];
@@ -20,7 +43,18 @@ function createEditor({ mount, getCfg, onChange }) {
         <option value="">+ Thêm…</option>
         <optgroup label="Khối thông tin">${Object.entries(FIELDS).map(([k, [l]]) => `<option value="field:${k}">${l}</option>`).join('')}</optgroup>
         <option value="text">Chữ tự do</option>
+        <optgroup label="Ảnh & hoạ tiết">
+          <option value="image">Ảnh…</option>
+          <option value="shape:line">Đường kẻ</option>
+          <option value="shape:frame">Khung</option>
+          <option value="shape:circle">Vòng tròn</option>
+        </optgroup>
       </select>
+      <select class="ed-preset" aria-label="Bố cục mẫu">
+        <option value="">Bố cục mẫu…</option>
+        ${Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}
+      </select>
+      <input type="file" class="ed-file" accept="image/*" hidden>
       <div class="seg" role="group" aria-label="Đường gióng">
         <button type="button" data-guide="thirds" title="Lưới một phần ba">⅓</button>
         <button type="button" data-guide="golden" title="Tỷ lệ vàng 38.2% / 61.8%">φ</button>
@@ -35,7 +69,7 @@ function createEditor({ mount, getCfg, onChange }) {
       <button type="button" class="btn" data-act="from-portrait">Tạo bản ngang từ bản dọc</button>
     </div>
     <div class="ed-stage"><div class="board" tabindex="0" aria-label="Trang thiết kế"></div></div>
-    <p class="hint ed-tip">Kéo để di chuyển · cạnh: đổi bề ngang · góc: phóng to/thu nhỏ · chấm tròn: xoay (Shift: bước 15°) · giữ Alt để tắt hít dính · phím mũi tên: dịch (Shift: dịch xa) · Delete: xoá · Ctrl+D: nhân bản</p>
+    <p class="hint ed-tip">Kéo để di chuyển · cạnh: đổi kích thước một chiều · góc: phóng to/thu nhỏ · chấm tròn: xoay (Shift: bước 15°) · giữ Alt để tắt hít dính · phím mũi tên: dịch (Shift: dịch xa) · Delete: xoá · Ctrl+D: nhân bản</p>
     <div class="ed-props"></div>`;
   const $ = s => mount.querySelector(s), board = $('.board'), props = $('.ed-props');
 
@@ -53,18 +87,29 @@ function createEditor({ mount, getCfg, onChange }) {
     const c = getCfg(), t = THEMES[c.theme] || THEMES.ivory, fo = FONTS[c.font] || FONTS.cormorant;
     const img = bgUrl(c.bg, 960);
     loadFont(fo);
+    const bimg = board.style.getPropertyValue('--bimg');
     board.style.cssText = `--bg:${t.bg};--fg:${t.fg};--muted:${t.muted};--accent:${t.accent};--line:${t.line};` +
       `--display:${fo.display};--body:"Be Vietnam Pro",system-ui,sans-serif;color:${t.fg};background-color:${t.bg};` +
-      `--bimg:${img ? `url("${img}")` : 'none'};--bx:${num(c.bgX, 0, 100, 50)}%;--by:${num(c.bgY, 0, 100, 50)}%;` +
+      `--bimg:${bimg || 'none'};--bx:${num(c.bgX, 0, 100, 50)}%;--by:${num(c.bgY, 0, 100, 50)}%;` +
       `--bz:${num(c.bgZoom, 100, 300, 100) / 100};--bdim:${img ? num(c.bgDim, 0, 95, 70) / 100 : 0};--bblur:${num(c.bgBlur, 0, 100, 0) / 100 * BLUR_MAX_PX * .6}px`;
+    if (board.dataset.bg !== img) { board.dataset.bg = img; imageSrc(img).then(u => { if (board.dataset.bg === img) board.style.setProperty('--bimg', u ? `url("${u}")` : 'none'); }); }
     const lines = ['thirds', 'golden', 'safe'].filter(k => show[k]).flatMap(k => GUIDES[k].map(p => [k, p]));
     board.innerHTML = lines.map(([k, p]) => `<i class="gl v ${k}" style="left:${p}%"></i><i class="gl h ${k}" style="top:${p}%"></i>`).join('') +
       `<i class="gl v center" style="left:50%"></i><i class="gl h center" style="top:50%"></i>` +
       boardItemsHTML(getCfg(), d.items) +
-      `<div class="ed-sel" hidden>${['w', 'e', 'nw', 'ne', 'sw', 'se'].map(h => `<b data-h="${h}"></b>`).join('')}<b data-h="rot"></b></div><div class="ed-snap"></div>`;
+      `<div class="ed-sel" hidden>${handlesFor(item(selId)).map(h => `<b data-h="${h}"></b>`).join('')}<b data-h="rot"></b></div><div class="ed-snap"></div>`;
+    hydrateImages(board);
     if (!item(selId)) selId = null;
     board.querySelectorAll('.it').forEach(el => el.classList.toggle('sel', el.dataset.id === selId));
     placeSel(); drawProps();
+  }
+  // Which resize handles make sense: text/line only stretch sideways; boxes also vertically; circle keeps 1:1.
+  function handlesFor(it) {
+    if (!it) return [];
+    const k = it.type === 'shape' ? it.shape : it.type;
+    if (k === 'line') return ['w', 'e'];
+    if (k === 'circle') return ['nw', 'ne', 'sw', 'se'];
+    return k === 'image' || k === 'frame' ? ['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'] : ['w', 'e', 'nw', 'ne', 'sw', 'se'];
   }
   const elOf = id => board.querySelector(`.it[data-id="${CSS.escape(id)}"]`);
 
@@ -98,6 +143,31 @@ function createEditor({ mount, getCfg, onChange }) {
     if (!it) { props.innerHTML = '<p class="hint">Chọn một phần tử trên trang để chỉnh.</p>'; return; }
     const steps = [-2, -1, 0, 1, 2, 3, 4, 5].map(n => Math.round(16 * ratio ** n * 10) / 10);
     const opt = (v, cur, l) => `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${l}</option>`;
+    const range = (p, l, min, max, step, v, unit = '') => `<label><span class="lbl">${l} <output>${v}${unit}</output></span><input type="range" data-p="${p}" min="${min}" max="${max}" step="${step}" value="${v}"></label>`;
+    const numIn = (p, l, min, max, step, v) => `<label><span class="lbl">${l}</span><input type="number" data-p="${p}" min="${min}" max="${max}" step="${step}" value="${v}"></label>`;
+    const actions = `<div class="full ed-actions">
+          <button type="button" class="btn ghost" data-act="center-x">Căn giữa ngang</button>
+          <button type="button" class="btn ghost" data-act="up">Đưa lên</button>
+          <button type="button" class="btn ghost" data-act="down">Đưa xuống</button>
+          <button type="button" class="btn ghost" data-act="dup">Nhân bản</button>
+          <button type="button" class="btn ghost" data-act="del">Xoá</button>
+        </div>`;
+    const common = numIn('w', 'Bề ngang (px)', 4, 4000, 1, Math.round(it.w)) + numIn('rot', 'Xoay (°)', -180, 180, 1, Math.round(it.rot || 0));
+    if (it.type === 'image') {
+      props.innerHTML = `<div class="grid">
+        <div class="full"><button type="button" class="btn" data-act="img">Thay ảnh…</button> <span class="hint">Ảnh được nén và mã hoá trước khi lưu.</span></div>
+        ${common}${numIn('h', 'Chiều cao (px)', 4, 4000, 1, Math.round(it.h || 100))}
+        ${range('rad', 'Bo góc', 0, 200, 1, it.rad || 0, 'px')}${range('op', 'Độ đậm', 10, 100, 5, it.op ?? 100, '%')}${actions}</div>`;
+      return;
+    }
+    if (it.type === 'shape') {
+      props.innerHTML = `<div class="grid">
+        <label><span class="lbl">Hình</span><select data-p="shape">${opt('line', it.shape, 'Đường kẻ')}${opt('frame', it.shape, 'Khung')}${opt('circle', it.shape, 'Vòng tròn')}</select></label>
+        <label><span class="lbl">Màu</span><select data-p="color">${opt('fg', it.color, 'Chữ chính')}${opt('muted', it.color, 'Chữ phụ')}${opt('accent', it.color, 'Màu nhấn')}</select></label>
+        ${common}${it.shape === 'frame' ? numIn('h', 'Chiều cao (px)', 4, 4000, 1, Math.round(it.h || 100)) + range('rad', 'Bo góc', 0, 200, 1, it.rad || 0, 'px') : ''}
+        ${range('t', 'Độ dày nét', .5, 12, .5, it.t || 1, 'px')}${range('op', 'Độ đậm', 10, 100, 5, it.op ?? 100, '%')}${actions}</div>`;
+      return;
+    }
     props.innerHTML = `
       <div class="grid">
         ${it.type === 'field'
@@ -119,13 +189,7 @@ function createEditor({ mount, getCfg, onChange }) {
         <div><span class="lbl">Kiểu</span><div class="seg">
           <button type="button" data-tog="italic" aria-pressed="${!!it.italic}"><em>Nghiêng</em></button>
           <button type="button" data-tog="caps" aria-pressed="${!!it.caps}">IN HOA</button></div></div>
-        <div class="full ed-actions">
-          <button type="button" class="btn ghost" data-act="center-x">Căn giữa ngang</button>
-          <button type="button" class="btn ghost" data-act="up">Đưa lên</button>
-          <button type="button" class="btn ghost" data-act="down">Đưa xuống</button>
-          <button type="button" class="btn ghost" data-act="dup">Nhân bản</button>
-          <button type="button" class="btn ghost" data-act="del">Xoá</button>
-        </div>
+        ${actions}
       </div>`;
   }
 
@@ -136,16 +200,16 @@ function createEditor({ mount, getCfg, onChange }) {
     if (!it || !p) return;
     if (!e.target.dataset.live) { checkpoint(); e.target.dataset.live = 1; } // one undo step per edit gesture
     const v = e.target.value;
-    it[p] = ['fs', 'w', 'rot', 'ls', 'lh', 'op'].includes(p) ? +v : v;
+    it[p] = ['fs', 'w', 'h', 't', 'rad', 'rot', 'ls', 'lh', 'op'].includes(p) ? +v : v;
     if (p === 'text' || p === 'field') { const el = elOf(it.id); if (el) el.firstChild.textContent = itemText(getCfg(), it); }
     const out = e.target.closest('label')?.querySelector('output');
-    if (out) out.textContent = p === 'ls' ? v + 'em' : p === 'op' ? v + '%' : v;
+    if (out) out.textContent = v + ({ ls: 'em', op: '%', rad: 'px', t: 'px' }[p] || '');
     paint(it);
   });
   mount.addEventListener('change', e => {
     e.stopPropagation();
     if (e.target.dataset.scale) { ratio = +e.target.value; drawProps(); return; }
-    if (e.target.dataset.p) { delete e.target.dataset.live; onChange(); if (['field', 'font'].includes(e.target.dataset.p)) draw(); }
+    if (e.target.dataset.p) { delete e.target.dataset.live; onChange(); if (['field', 'font', 'shape'].includes(e.target.dataset.p)) draw(); }
   });
 
   mount.addEventListener('click', e => {
@@ -160,9 +224,10 @@ function createEditor({ mount, getCfg, onChange }) {
       // Same vertical rhythm on a 1440×900 screen: scale sizes by the reference-height ratio.
       checkpoint();
       const k = REF.landscape[1] / REF.portrait[1];
-      layout.landscape = { items: (layout.portrait?.items || []).map(i => ({ ...i, id: uid(), w: Math.round(i.w * k), fs: Math.round(i.fs * k * 10) / 10 })) };
+      layout.landscape = { items: (layout.portrait?.items || []).map(i => scaleItem(i, k)) };
       return commit();
     }
+    if (d.act === 'img') return pickImage(it);
     if (!it) return;
     checkpoint();
     if (d.fs) it.fs = +d.fs;
@@ -184,11 +249,53 @@ function createEditor({ mount, getCfg, onChange }) {
     const v = e.target.value; e.target.value = '';
     if (!v || !cur()) return;
     checkpoint();
-    const [, field] = v.split(':'), big = orient === 'landscape' ? 1.07 : 1;
-    const it = { id: uid(), type: field ? 'field' : 'text', cx: 50, cy: 50, w: Math.round(280 * big), fs: Math.round(20 * big), rot: 0,
-      font: 'display', align: 'center', color: 'fg', lh: 1.25, ...(field ? { field } : { text: 'Chữ mới' }) };
+    if (v === 'image') { undo.pop(); return pickImage(null); }
+    const [kind, sub] = v.split(':'), big = orient === 'landscape' ? 1.07 : 1;
+    const it = kind === 'shape'
+      ? { id: uid(), type: 'shape', shape: sub, cx: 50, cy: 50, w: Math.round((sub === 'line' ? 60 : sub === 'circle' ? 120 : 260) * big), h: Math.round(320 * big), t: 1, rot: 0, color: 'accent' }
+      : { id: uid(), type: kind === 'field' ? 'field' : 'text', cx: 50, cy: 50, w: Math.round(280 * big), fs: Math.round(20 * big), rot: 0,
+        font: 'display', align: 'center', color: 'fg', lh: 1.25, ...(kind === 'field' ? { field: sub } : { text: 'Chữ mới' }) };
     cur().items.push(it); selId = it.id; commit(); board.focus();
   });
+
+  // Photo: new item (target null) or replace the selected image's source.
+  let pickTarget = null;
+  function pickImage(target) {
+    if (!upload) return;
+    pickTarget = target; $('.ed-file').click();
+  }
+  $('.ed-file').addEventListener('change', async e => {
+    e.stopPropagation();
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file || !cur()) return;
+    const src = await upload(file);
+    if (!src) return;
+    checkpoint();
+    const t = pickTarget && item(pickTarget.id);
+    if (t) t.src = src;
+    else {
+      const bmp = await createImageBitmap(file).catch(() => null), ratio = bmp ? bmp.height / bmp.width : 1.25; bmp?.close();
+      const w = orient === 'landscape' ? 360 : 220, it = { id: uid(), type: 'image', src, cx: 50, cy: 50, w, h: Math.round(w * ratio), rot: 0, rad: 0 };
+      cur().items.push(it); selId = it.id;
+    }
+    commit();
+  });
+
+  $('.ed-preset').addEventListener('change', e => {
+    e.stopPropagation();
+    const p = PRESETS[e.target.value]; e.target.value = '';
+    if (!p || !cur()) return;
+    if (cur().items.length && !confirm(`Thay toàn bộ bản ${orient === 'portrait' ? 'dọc' : 'ngang'} bằng "${p.label}"? (Hoàn tác được bằng Ctrl+Z)`)) return;
+    checkpoint();
+    const k = orient === 'landscape' ? REF.landscape[1] / REF.portrait[1] : 1;
+    cur().items = p.items.map(i => scaleItem(i, k)); selId = null; commit();
+  });
+
+  // Copy an item with sizes scaled by k (portrait -> landscape keeps the vertical rhythm).
+  function scaleItem(i, k) {
+    const r = v => v == null ? v : Math.round(v * k * 10) / 10;
+    return { ...i, id: uid(), w: Math.round(i.w * k), fs: r(i.fs), h: r(i.h), t: r(i.t), rad: r(i.rad) };
+  }
 
   // ---------- pointer: select, move, resize, rotate ----------
   const R = () => board.getBoundingClientRect();
@@ -242,6 +349,14 @@ function createEditor({ mount, getCfg, onChange }) {
         if (ev.shiftKey) a = Math.round(a / 15) * 15;
         else for (const s of [-180, -90, 0, 90, 180]) if (Math.abs(a - s) < 3) a = s;
         it.rot = Math.round(a * 10) / 10; paint(it);
+      } else if (h === 'n' || h === 's') {
+        // Height along the item's own (rotated) y axis; the opposite edge stays put.
+        const t = (it0.rot || 0) * Math.PI / 180, ax = -Math.sin(t), ay = Math.cos(t);
+        const along = (dx * ax + dy * ay) * (h === 's' ? 1 : -1);
+        const hpx = Math.max(8, it0.h * u + along), grow = hpx - it0.h * u, s = h === 's' ? 1 : -1;
+        it.h = hpx / u;
+        it.cx = it0.cx + s * grow / 2 * ax / r.width * 100; it.cy = it0.cy + s * grow / 2 * ay / r.height * 100;
+        paint(it);
       } else if (h === 'w' || h === 'e') {
         // Width along the item's own (rotated) x axis; the opposite edge stays put.
         const t = (it0.rot || 0) * Math.PI / 180, ax = Math.cos(t), ay = Math.sin(t);
@@ -251,14 +366,18 @@ function createEditor({ mount, getCfg, onChange }) {
         it.cx = it0.cx + s * grow / 2 * ax / r.width * 100; it.cy = it0.cy + s * grow / 2 * ay / r.height * 100;
         paint(it);
       } else {
-        // Corners scale text (size + width) around the centre.
+        // Corners scale the whole item (text size, box) around the centre, keeping proportions.
         const k = Math.max(.1, Math.hypot(ev.clientX - cx0, ev.clientY - cy0) / Math.max(1, Math.hypot(x0 - cx0, y0 - cy0)));
-        it.fs = Math.round(it0.fs * k * 2) / 2; it.w = it0.w * k; paint(it);
+        it.w = it0.w * k;
+        if (it0.fs != null) it.fs = Math.round(it0.fs * k * 2) / 2;
+        if (it0.h != null) it.h = it0.h * k;
+        paint(it);
       }
     };
     const up = () => {
       board.removeEventListener('pointermove', move); $('.ed-snap').innerHTML = '';
       it.cx = Math.round(it.cx * 100) / 100; it.cy = Math.round(it.cy * 100) / 100; it.w = Math.round(it.w);
+      if (it.h != null) it.h = Math.round(it.h);
       if (snapshot() !== before) { undo.push(before); redo.length = 0; commit(); }
     };
     board.addEventListener('pointermove', move);

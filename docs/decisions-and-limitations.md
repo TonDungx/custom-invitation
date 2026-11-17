@@ -61,19 +61,30 @@ Khung che cả khối chữ làm dòng thứ 2 bị cắt giữa chừng, trông
 - **Giải pháp:** `saveConfig(mutate)` luôn đọc bản mới nhất rồi chỉ thay phần của mình. Trang thiết kế ghi `layout.portrait/landscape` (và bật `mode: free`); trang form ghi mọi trường còn lại cùng `layout.mode`.
 - **Đánh đổi:** trang thiết kế hiển thị nội dung **đã lưu** của form, không phải nội dung đang gõ dở ở tab form.
 
+### QĐ-11: Mã hoá nội dung, khoá nằm trong fragment của link
+- **Bối cảnh:** repo public để Pages miễn phí, nên tên, ngày, địa điểm, ảnh đều công khai. Người dùng chọn mã hoá thay vì trả phí cho repo private.
+- **Chọn:** AES-GCM 256-bit (WebCrypto). `config.json` = `{v:1, enc}`; ảnh = `uploads/*.bin` (iv ‖ ciphertext). Khoá trong `#k=` (fragment không gửi lên server) và `localStorage`. Phân tích: `_bmad-output/planning-artifacts/privacy-notify-analysis.md` (chỉ có trên máy).
+- **Đánh đổi:** link dài thêm khoảng 45 ký tự; mất khoá là mất nội dung (nhập lại được); **lịch sử git vẫn còn các bản rõ trước khi mã hoá** (`config.json` cũ, 3 ảnh `.webp` cũ). Xoá hẳn cần viết lại lịch sử và force-push; chưa làm vì đó là thao tác phá huỷ, cần người dùng đồng ý riêng.
+
+### QĐ-12: Thông báo qua Google Apps Script của chính người dùng
+- **Bối cảnh:** người dùng gửi Gmail App Password trong chat. Web tĩnh không giữ được bí mật: đặt mật khẩu vào code đồng nghĩa với công khai nó. **Không dùng, khuyên thu hồi.**
+- **Chọn:** Web App Apps Script (`doPost` → `MailApp`), chạy dưới tài khoản người dùng. Trang thiệp `POST` kiểu `no-cors`. URL nằm trong config đã mã hoá. Script giới hạn 30 mail/giờ và escape dữ liệu.
+- **Đánh đổi:** người dùng phải tự deploy (khoảng 5 phút). Trang không biết mail đã gửi được chưa (phản hồi opaque).
+
 ## Giới hạn đã biết
 
 | Giới hạn | Ảnh hưởng | Cách khắc phục (nếu cần) |
 |---|---|---|
-| Nội dung `config.json` và `uploads/` công khai | Ai mở repo cũng đọc được tên, ngày, địa điểm | Chuyển dữ liệu sang kho riêng có xác thực, hoặc dùng GitHub Pro (Pages từ repo private) [Unverified] |
+| Lịch sử git còn bản rõ trước khi mã hoá | `config.json` cũ và 3 ảnh `.webp` cũ vẫn xem được qua lịch sử commit | Viết lại lịch sử (`git filter-repo`) và force-push. Thao tác phá huỷ, cần đồng ý riêng. |
+| Mất khoá | Không đọc lại được config | Nhập lại nội dung, lưu với khoá mới |
 | Admin không có mật khẩu | Ai vào `/admin` cũng xem được giao diện, nhưng **không lưu được** nếu không có token | Đủ an toàn cho mục đích hiện tại |
-| Bấm "Đồng ý" không báo cho người gửi | Chỉ biết khi người ấy dùng nút nhắn lại | Thêm webhook hoặc form, ví dụ ghi vào một file khác bằng một token chỉ ghi |
+| Thông báo cần người dùng tự deploy Apps Script | Chưa deploy thì không có mail | Làm theo [notifications.md](notifications.md) |
 | Một thiệp tại một thời điểm | Mỗi repo chỉ có một `config.json` | Thêm tham số `?id=` và `configs/<id>.json` |
 | Ngày giờ không có múi giờ | Người xem ở múi giờ khác thấy đếm ngược lệch | Lưu kèm offset |
 | Rate limit API 60/giờ/IP [Unverified] | Vượt thì có thể thấy bản cũ tới 10 phút | Hiếm khi gặp với một thiệp |
-| `.ics` không có nhắc nhở; trình duyệt trong Messenger/Zalo có thể chặn tải | Nút lịch không hoạt động ở một số nơi | Thêm link Google Calendar, `VALARM`, gợi ý "mở bằng trình duyệt" |
+| Trình duyệt trong Messenger/Zalo có thể chặn tải `.ics` | Nút "Lịch Apple / Outlook" có thể không chạy trong ứng dụng | Đã có nút Google Calendar và dòng nhắc "mở bằng trình duyệt" |
 | Ảnh preset lấy từ Unsplash | Tác giả xoá ảnh thì nền thành màu trơn | Tải ảnh về repo |
-| Chỉ kiểm thử tự động trên Chrome | Safari, Firefox chưa được kiểm thử tự động | Thêm WebKit vào `check.mjs` |
+| Chưa thử trên máy thật | `check-devices.mjs` giả lập WebKit và Chrome mobile, không thay được iPhone và ứng dụng thật | Gửi link cho chính mình và thử trên điện thoại |
 | Thanh tiến độ cần `animation-timeline` | Trình duyệt chưa hỗ trợ thì không hiện thanh | Chấp nhận (chỉ là trang trí) |
 
 ## Lịch sử lỗi và bài học
@@ -89,13 +100,12 @@ Khung che cả khối chữ làm dòng thứ 2 bị cắt giữa chừng, trông
 | Ô "Giờ" đè lên ô "Tên quán" trong admin | Ô chọn giờ gốc rộng hơn cột 7rem | Chụp màn hình form ở kích thước thật. |
 | Push bị từ chối | Admin đã commit `config.json` lên `main` | Luôn `git pull --rebase` trước khi push. |
 | `board.css` không áp dụng trong test, trang thiết kế vỡ | Server test trả `.css` với kiểu `text/plain` | Server tĩnh tự viết phải map đủ kiểu file. Khi thấy lỗi giao diện chỉ trong test, kiểm tra Network trước. |
+| Nút từ chối có thể nhảy đè lên nút Đồng ý (chỉ khi dùng cảm ứng) | Một lần chạm sinh `pointerdown` và `click`, nên né 2 lần; lần 2 đo vị trí lúc nút đang trượt dở nên tính sai gốc | Không đo vị trí qua `getBoundingClientRect` khi có transition đang chạy; dùng offset bố cục. Thử cảm ứng bằng `tap`, không chỉ `dispatchEvent`. |
+| Gợi ý cuộn đè chữ ký trên iPhone SE | Màn thấp nên nội dung chạm vùng gợi ý | Kiểm tra màn nhỏ (320×568) cho mọi lớp phủ cố định |
 | Ngày test ghi cứng sẽ làm test hỏng sau ngày đó | `2026-12-24` cố định trong `check.mjs` | Ngày trong test phải tính tương đối (năm sau). |
 
 ## Ý tưởng tiếp theo (chưa làm)
-- **Bố cục tự do P2:** ảnh, hoạ tiết (đường kẻ, khung, tròn), 3 bố cục mẫu bấm một lần. **P3:** danh sách lớp, khoá phần tử.
-- Nút Google Calendar, nhắc nhở trong `.ics`, gợi ý "mở bằng trình duyệt" khi đang ở trong ứng dụng.
-- Nút dọn ảnh không dùng trong `uploads/`.
-- Ghi nhận khi người ấy bấm đồng ý (cần một nơi lưu có thể ghi từ phía người xem).
+- **Trình thiết kế P3:** danh sách lớp, khoá phần tử.
+- Xoá bản rõ khỏi lịch sử git (cần đồng ý vì là thao tác phá huỷ).
 - Nhiều thiệp trong một repo (`?id=`).
-- Thẻ Open Graph (ảnh xem trước khi gửi link qua Messenger, Zalo).
 - Nhạc nền (tắt mặc định, có nút bật).

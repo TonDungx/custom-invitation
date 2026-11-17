@@ -58,9 +58,11 @@ const $ = s => document.querySelector(s);
 let base = structuredClone(DEFAULT), saved = '';
 
 // Content (names, title, theme, background…) comes from the saved config; this page only edits layout.
-const ed = createEditor({ mount: $('#editor'), getCfg: () => base, onChange: refreshState });
+const ed = createEditor({ mount: $('#editor'), getCfg: () => base, onChange: refreshState,
+  upload: file => uploadImage(file).catch(e => { toast('Không tải được ảnh (' + e.message + ').'); return null; }) });
 const dirty = () => JSON.stringify(ed.get()) !== saved;
 function refreshState() {
+  if (base.locked) return;
   const d = dirty();
   $('#apply').disabled = !d;
   setStatus(d ? 'Chưa lưu' : 'Đã lưu', d ? 'dirty' : '');
@@ -68,6 +70,10 @@ function refreshState() {
 
 async function load() {
   base = await fetchConfig('../../config.json');
+  if (base.locked) { // encrypted and no key: never overwrite real content with defaults
+    $('#apply').onclick = null; $('#apply').disabled = true;
+    setStatus('Chưa mở khoá', 'error'); toast('Chưa mở khoá: cần link thiệp đầy đủ để sửa thiết kế. Tải lại trang để nhập.');
+  }
   const isNew = !base.layout?.portrait;
   ed.set(base.layout); ed.ensurePortrait();
   saved = isNew ? '' : JSON.stringify(ed.get()); // a fresh default design counts as unsaved

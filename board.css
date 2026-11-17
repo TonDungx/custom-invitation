@@ -10,3 +10,10 @@
   opacity: var(--op);
 }
 .board .tx { font-size: calc(var(--fs) * var(--u)); white-space: pre-line; overflow-wrap: break-word; }
+/* Photos: fixed box (w × h design px), cropped to fill. */
+.board .im { display: block; width: 100%; height: calc(var(--h) * var(--u)); object-fit: cover; border-radius: calc(var(--rad) * var(--u)); user-select: none; }
+/* Decorations, drawn in the item's text colour (theme token). */
+.board .sh { display: block; width: 100%; }
+.board .sh.line { height: max(1px, calc(var(--t) * var(--u))); background: currentColor; }
+.board .sh.frame { height: calc(var(--h) * var(--u)); border: max(1px, calc(var(--t) * var(--u))) solid currentColor; border-radius: calc(var(--rad) * var(--u)); }
+.board .sh.circle { aspect-ratio: 1; border: max(1px, calc(var(--t) * var(--u))) solid currentColor; border-radius: 50%; }

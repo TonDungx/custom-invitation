@@ -95,6 +95,15 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
         <label class="full"><span class="lbl">Lời cảm ơn</span><input name="thanks" maxlength="80"></label>
         <label><span class="lbl">Link nhắn lại</span><input type="url" name="reply" placeholder="https://m.me/username"><span class="hint">Messenger, Zalo, hoặc sms:0901234567. Để trống để ẩn.</span></label>
         <label><span class="lbl">Chữ trên nút nhắn</span><input name="replyLabel" maxlength="30"></label>
+        <div class="full notify">
+          <p class="lbl" style="margin-bottom:.6rem">Thông báo qua email</p>
+          <label><span class="hint">Link Web App của Google Apps Script (xem hướng dẫn <a href="https://github.com/TonDungx/custom-invitation/blob/main/docs/notifications.md" target="_blank" rel="noopener">tại đây</a>). Để trống để tắt. Link này được mã hoá cùng nội dung thiệp.</span>
+            <input type="url" name="notifyUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
+          <div class="notify-row">
+            <label class="check"><input type="checkbox" name="notifyOpen"> Báo cả khi người ấy mở thiệp</label>
+            <button class="btn" id="notifyTest" type="button">Gửi thử</button>
+          </div>
+        </div>
       </div>
     </fieldset>
 
@@ -125,7 +134,11 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
           <input type="hidden" name="bgX"><input type="hidden" name="bgY"></div>
         <label><span class="lbl">Phóng to <output name="zoomOut"></output></span><input type="range" name="bgZoom" min="100" max="300" step="5"><span class="hint">Phóng quanh điểm lấy nét.</span></label>
       </fieldset>
-      <p class="hint" style="margin-top:1rem">Ảnh gợi ý từ <a href="https://unsplash.com/license" target="_blank" rel="noopener">Unsplash</a>, miễn phí sử dụng.</p>
+      <div class="upload" style="margin-top:1.25rem">
+        <button class="btn ghost" id="clean" type="button">Dọn ảnh không dùng</button>
+        <span class="hint">Xoá các ảnh đã tải lên mà thiệp không còn dùng (ảnh nền, ảnh trong trang thiết kế được giữ lại).</span>
+      </div>
+      <p class="hint" style="margin-top:1rem">Ảnh gợi ý từ <a href="https://unsplash.com/license" target="_blank" rel="noopener">Unsplash</a>, miễn phí sử dụng. Ảnh tải lên được mã hoá trước khi lưu vào repo.</p>
     </fieldset>
   </form>
 
@@ -151,14 +164,13 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
 
 <script type="module">
 const $ = s => document.querySelector(s), f = $('#f'), stops = $('#stops');
-const TEXT = ['to', 'from', 'title', 'message', 'date', 'ask', 'accept', 'decline', 'thanks', 'reply', 'replyLabel'];
+const TEXT = ['to', 'from', 'title', 'message', 'date', 'ask', 'accept', 'decline', 'thanks', 'reply', 'replyLabel', 'notifyUrl'];
 const DECLINE_HINT = {
   dodge: 'Rê chuột hoặc chạm vào là nút nhảy sang chỗ trống khác.',
   smoke: 'Mỗi lần bấm nút nóng dần và bốc khói, lần thứ 4 thì cháy mất.',
   vanish: 'Bấm một lần là nút tan thành bụi rồi biến mất.',
   off: 'Chỉ hiện nút đồng ý.',
 };
-const shareUrl = new URL('../', location.href).href;
 let saved = '';
 // Designs are edited at /admin/design; this page only shows them in the preview and owns layout.mode.
 let lay = { portrait: null, landscape: null };
@@ -179,8 +191,8 @@ function syncBg() {
   const e = f.elements, v = e.bg.value;
   $('#bgCustom').hidden = v !== 'custom';
   const custom = bgUrl(e.bgUrl.value, 0), tile = $('#bgs [value=custom] + span b');
-  tile.style.backgroundImage = custom ? `url("${custom}")` : '';
   tile.textContent = custom ? '' : '+';
+  imageSrc(custom).then(u => tile.style.backgroundImage = u ? `url("${u}")` : '');
   $('#bgOpts').disabled = v === 'none';
   e.dimOut.value = e.bgDim.value + '%';
   e.blurOut.value = e.bgBlur.value + '%';
@@ -189,7 +201,8 @@ function syncBg() {
   // Focal point: show the chosen photo with a draggable dot.
   e.zoomOut.value = e.bgZoom.value + '%';
   const src = bgUrl(v === 'custom' ? e.bgUrl.value : v === 'none' ? '' : v, 480);
-  if ($('#focalImg').getAttribute('src') !== src) $('#focalImg').src = src;
+  const fi = $('#focalImg');
+  if (fi.dataset.s !== src) { fi.dataset.s = src; imageSrc(src).then(u => { if (fi.dataset.s === src) fi.src = u; }); }
   $('#focal').hidden = !src;
   Object.assign($('#focal i').style, { left: e.bgX.value + '%', top: e.bgY.value + '%' });
   // Layout mode: link to the designer only in "Tự thiết kế".
@@ -219,6 +232,7 @@ function addStop(s = {}) {
 function fill(c) {
   TEXT.forEach(k => f.elements[k].value = c[k] ?? '');
   f.elements.theme.value = c.theme; f.elements.font.value = c.font; f.elements.intro.checked = !!c.intro;
+  f.elements.notifyOpen.checked = !!c.notifyOpen;
   const preset = !c.bg || BACKGROUNDS[c.bg];
   f.elements.bg.value = !c.bg ? 'none' : preset ? c.bg : 'custom';
   f.elements.bgUrl.value = preset ? '' : c.bg;
@@ -235,6 +249,7 @@ function read() {
   const c = {};
   TEXT.forEach(k => c[k] = f.elements[k].value.trim());
   c.theme = f.elements.theme.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
+  c.notifyOpen = f.elements.notifyOpen.checked;
   c.declineMode = f.elements.declineMode.value;
   const bg = f.elements.bg.value;
   c.bg = bg === 'custom' ? f.elements.bgUrl.value.trim() : bg === 'none' ? '' : bg;
@@ -252,6 +267,7 @@ const json = () => { const c = read(); c.layout = c.layout?.mode ?? null; return
 const dirty = () => json() !== saved;
 function refreshState() {
   const d = dirty();
+  if (locked) return;
   $('#apply').disabled = !d;
   setStatus(d ? 'Chưa lưu' : 'Đã lưu', d ? 'dirty' : '');
 }
@@ -266,13 +282,18 @@ let t; f.addEventListener('input', () => {
 });
 addEventListener('beforeunload', e => { if (dirty()) e.preventDefault(); });
 
+let locked = false;
 async function load() {
-  fill(await fetchConfig('../config.json'));
-  saved = json(); await update();
+  const c = await fetchConfig('../config.json');
+  locked = !!c.locked;
+  fill(c); saved = json(); await update();
+  $('#view').href = shareLink('../');
+  if (locked) { setStatus('Chưa mở khoá', 'error'); $('#apply').disabled = true; toast('Chưa mở khoá: cần link thiệp đầy đủ để sửa nội dung.'); }
 }
 
 // Save this page's fields into the latest remote config; keep the designer's layout as saved there.
 async function apply() {
+  if (locked) return toast('Chưa mở khoá: tải lại trang và dán link thiệp đầy đủ.'); // never overwrite real content with defaults
   const btn = $('#apply'); btn.disabled = true; setStatus('Đang lưu…', 'dirty');
   const mine = read(), mode = f.elements.layoutMode.value;
   delete mine.layout;
@@ -282,7 +303,8 @@ async function apply() {
     if (!res) { btn.disabled = false; return refreshState(); }
     lay = { portrait: res.layout?.portrait || null, landscape: res.layout?.landscape || null };
     saved = json(); await update();
-    toast('Đã lưu. Link thiệp hiển thị nội dung mới sau khoảng 1 phút.');
+    $('#view').href = shareLink('../');
+    toast('Đã lưu (đã mã hoá). Link thiệp hiển thị nội dung mới sau khoảng 1 phút.');
   } catch (e) {
     setStatus('Lỗi khi lưu', 'error'); btn.disabled = false; toast('Không lưu được (' + e.message + '). Thử lại.');
   }
@@ -290,45 +312,59 @@ async function apply() {
 
 // Back from the designer tab: pick up its saved layout (and everything else if nothing is pending here).
 addEventListener('focus', async () => {
-  if (!hasToken() || document.getElementById('dlg')?.open) return;
+  if (!hasToken() || locked || document.querySelector('dialog[open]')) return;
   const c = await fetchConfig('../config.json');
   if (dirty()) lay = { portrait: c.layout?.portrait || null, landscape: c.layout?.landscape || null };
   else { fill(c); saved = json(); }
   update();
 });
 
-// ---- Upload a background photo from this device ----
-// Resized + re-encoded in the browser, committed to uploads/ and referenced by commit SHA
-// (raw.githubusercontent.com, immutable -> usable immediately, no Pages rebuild wait).
-// ponytail: replaced photos stay in the repo; delete old files in uploads/ by hand if size matters.
-async function compress(file) {
-  const bmp = await createImageBitmap(file);
-  const s = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
-  const c = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * s), height: Math.round(bmp.height * s) });
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); bmp.close();
-  const enc = type => new Promise(ok => c.toBlob(ok, type, .82));
-  const b = await enc('image/webp');
-  return b?.type === 'image/webp' ? b : enc('image/jpeg'); // older Safari can't encode WebP
-}
-const blobB64 = b => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.readAsDataURL(b); });
-
+// ---- Upload a background photo (resized + encrypted in common.js) ----
 async function upload(file) {
-  if (!file?.type.startsWith('image/')) return toast('Chỉ nhận file ảnh.');
-  if (file.size > 25e6) return toast('Ảnh lớn quá (tối đa 25MB).');
   const btn = $('#pick'); btn.disabled = true; btn.textContent = 'Đang tải ảnh…';
   try {
-    const blob = await compress(file);
-    const path = `uploads/${Date.now()}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
-    const commit = await putFile(path, await blobB64(blob), 'chore: upload background');
-    if (!commit) return;
-    f.elements.bg.value = 'custom';
-    f.elements.bgUrl.value = `https://raw.githubusercontent.com/${gh.repo}/${commit}/${path}`;
+    const src = await uploadImage(file);
+    if (!src) return;
+    f.elements.bg.value = 'custom'; f.elements.bgUrl.value = src;
     syncBg(); await update();
-    toast(`Đã tải ảnh (${Math.round(blob.size / 1024)} KB). Bấm Áp dụng để dùng.`);
   } catch (e) {
     toast('Không tải được ảnh (' + e.message + ').');
   } finally { btn.disabled = false; btn.textContent = 'Tải ảnh từ máy'; $('#file').value = ''; }
 }
+
+// ---- Delete uploads/ files that neither the saved config nor this form uses ----
+// Each delete is one commit. Old files stay in git history (and raw links pinned to old commits keep working).
+async function cleanUploads() {
+  if (!hasToken() && !(await askToken())) return;
+  const btn = $('#clean'); btn.disabled = true;
+  try {
+    const r = await fetch(ghApi('uploads'), { headers: authH(), cache: 'no-store' });
+    if (r.status === 404) return toast('Chưa có ảnh nào được tải lên.');
+    if (!r.ok) throw new Error(r.status);
+    const files = (await r.json()).filter(x => x.type === 'file');
+    const used = JSON.stringify([await fetchConfig('../config.json'), read()]);
+    const unused = files.filter(x => !used.includes(x.path));
+    if (!unused.length) return toast(`Không có ảnh thừa (${files.length} ảnh đều đang dùng).`);
+    if (!confirm(`Xoá ${unused.length}/${files.length} ảnh không dùng?\n\nNếu trang Thiết kế đang có ảnh mới chưa bấm Áp dụng, hãy Áp dụng ở đó trước.`)) return;
+    let n = 0;
+    for (const x of unused) {
+      const d = await fetch(ghApi(x.path), { method: 'DELETE', headers: authH(), body: JSON.stringify({ message: 'chore: remove unused photo', sha: x.sha }) });
+      if (d.ok) n++;
+    }
+    toast(`Đã xoá ${n} ảnh không dùng.`);
+  } catch (e) { toast('Không dọn được ảnh (' + e.message + ').'); }
+  finally { btn.disabled = false; }
+}
+$('#clean').onclick = cleanUploads;
+
+// ---- Notification test (the invite sends the same request on accept / open) ----
+$('#notifyTest').onclick = () => {
+  const url = notifyEndpoint(f.elements.notifyUrl.value.trim());
+  if (!url) return toast('Link phải có dạng https://script.google.com/macros/s/…/exec');
+  sendNotify(url, { event: 'test', ...read() });
+  toast('Đã gửi thử. Kiểm tra hộp thư (kể cả mục Spam) sau ít giây.');
+};
+
 $('#pick').onclick = () => $('#file').click();
 $('#file').onchange = e => upload(e.target.files[0]);
 const zone = $('#s-bg');
@@ -341,8 +377,9 @@ $('#gh').onclick = async () => { if (await askToken()) { await load(); toast('Đ
 addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (dirty()) apply(); } });
 $('#add').onclick = () => { addStop(); stops.lastElementChild.querySelector('[data-k=time]').focus(); update(); };
 $('#copy').onclick = async () => {
-  try { await navigator.clipboard.writeText(shareUrl); toast(dirty() ? 'Đã sao chép. Nhớ bấm Áp dụng để lưu thay đổi.' : 'Đã sao chép link'); }
-  catch { prompt('Sao chép link này:', shareUrl); }
+  const link = shareLink('../');
+  try { await navigator.clipboard.writeText(link); toast(dirty() ? 'Đã sao chép. Nhớ bấm Áp dụng để lưu thay đổi.' : 'Đã sao chép link (có mã khoá, chỉ ai có link mới xem được)'); }
+  catch { prompt('Sao chép link này:', link); }
 };
 $('#replay').onclick = async () => { $('#pv').src = '../index.html?r=' + Date.now() + '#' + await pack(read()); };
 

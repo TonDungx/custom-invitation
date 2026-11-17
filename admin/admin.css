@@ -111,6 +111,8 @@ input[type=range] { width: 100%; min-height: 2.75rem; accent-color: var(--fg); c
 .focal img { width: 100%; height: auto; display: block; }
 .focal i { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.35); pointer-events: none; }
 
+.notify { display: grid; gap: .6rem; padding: 1rem; border: 1px solid var(--line); background: var(--panel); }
+.notify-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
 .design-link { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; margin-top: 1rem; }
 
 /* Free-layout designer (/admin/design) */
@@ -120,6 +122,7 @@ input[type=range] { width: 100%; min-height: 2.75rem; accent-color: var(--fg); c
 .editor .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 .editor .seg button:disabled { opacity: .35; cursor: default; }
 .ed-bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: 1rem; }
+.board .it-image, .board .it-shape { cursor: move; }
 .ed-bar select, .ed-props select { min-height: 2.5rem; padding: 0 .6rem; font: inherit; font-size: .85rem; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--fg); }
 .ed-empty { padding: 2rem; border: 1px dashed var(--line); text-align: center; color: var(--muted); display: grid; gap: 1rem; justify-items: center; }
 .ed-stage { display: grid; place-items: center; padding: 1.25rem; background: repeating-conic-gradient(#efebe4 0 25%, #f6f3ee 0 50%) 0 0 / 16px 16px; border: 1px solid var(--line); }
@@ -147,6 +150,8 @@ input[type=range] { width: 100%; min-height: 2.75rem; accent-color: var(--fg); c
 .board .ed-sel b { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; background: #fff; border: 1px solid #3b82f6; pointer-events: auto; }
 .board .ed-sel b[data-h="w"] { left: 0; top: 50%; cursor: ew-resize; height: 18px; margin-top: -9px; width: 6px; margin-left: -3px; border-radius: 3px; }
 .board .ed-sel b[data-h="e"] { left: 100%; top: 50%; cursor: ew-resize; height: 18px; margin-top: -9px; width: 6px; margin-left: -3px; border-radius: 3px; }
+.board .ed-sel b[data-h="n"] { left: 50%; top: 0; cursor: ns-resize; width: 18px; margin-left: -9px; height: 6px; margin-top: -3px; border-radius: 3px; }
+.board .ed-sel b[data-h="s"] { left: 50%; top: 100%; cursor: ns-resize; width: 18px; margin-left: -9px; height: 6px; margin-top: -3px; border-radius: 3px; }
 .board .ed-sel b[data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
 .board .ed-sel b[data-h="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
 .board .ed-sel b[data-h="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
