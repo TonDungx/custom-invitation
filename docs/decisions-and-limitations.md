@@ -45,6 +45,15 @@ Mọi hiệu ứng (hiện dần, phong thư, nút từ chối, hạt khói) đ�
 ### QĐ-8: Tiêu đề hiện từng chữ, không dùng khung che
 Khung che cả khối chữ làm dòng thứ 2 bị cắt giữa chừng, trông nghiệp dư (phản hồi của người dùng). Mỗi chữ là một `inline-block` đi từ mờ sang nét, lệch nhau 70ms.
 
+### QĐ-9: Bố cục tự do: hai bản dọc và ngang, tâm theo %, kích thước theo "px thiết kế"
+- **Bối cảnh:** người dùng muốn kéo thả tự do và thiệp lấp đầy mọi màn hình (điện thoại, laptop, PC). Toạ độ pixel cố định thì vỡ trên màn hình khác. Một bản dọc kéo giãn ra màn ngang thì chồng chữ.
+- **Chọn (người dùng duyệt):**
+  - Hai bản thiết kế: dọc (chuẩn 390×844) và ngang (chuẩn 1440×900).
+  - Vị trí là **tâm** theo %, kích thước và cỡ chữ theo px thiết kế, nhân với `--u = min(rộng/390, cao/844)`. Màn hình thấp hơn thì chữ co đúng bằng mức khoảng cách dọc co lại, nên không chồng.
+  - Chưa có bản ngang thì dùng bản dọc ở giữa.
+- **Kỹ thuật:** CSS container query units, Pointer Events thuần. Không dùng Moveable, interact.js hay canvas (Fabric.js). Phân tích BMAD: `_bmad-output/planning-artifacts/freeform-editor-analysis.md` (chỉ có trên máy, không commit).
+- **Đánh đổi:** phải thiết kế hai lần nếu muốn đẹp trên màn ngang. Màn hình tỷ lệ lạ (máy gập, siêu rộng) sẽ có khoảng trống.
+
 ## Giới hạn đã biết
 
 | Giới hạn | Ảnh hưởng | Cách khắc phục (nếu cần) |
@@ -72,9 +81,11 @@ Khung che cả khối chữ làm dòng thứ 2 bị cắt giữa chừng, trông
 | Trang co 10px khi mở thư | Thanh cuộn gốc chiếm chỗ khi hết khoá cuộn | Kiểm tra trên trình duyệt **có giao diện**, vì chế độ chạy ngầm ẩn thanh cuộn. |
 | Ô "Giờ" đè lên ô "Tên quán" trong admin | Ô chọn giờ gốc rộng hơn cột 7rem | Chụp màn hình form ở kích thước thật. |
 | Push bị từ chối | Admin đã commit `config.json` lên `main` | Luôn `git pull --rebase` trước khi push. |
+| `board.css` không áp dụng trong test, trang thiết kế vỡ | Server test trả `.css` với kiểu `text/plain` | Server tĩnh tự viết phải map đủ kiểu file. Khi thấy lỗi giao diện chỉ trong test, kiểm tra Network trước. |
 | Ngày test ghi cứng sẽ làm test hỏng sau ngày đó | `2026-12-24` cố định trong `check.mjs` | Ngày trong test phải tính tương đối (năm sau). |
 
 ## Ý tưởng tiếp theo (chưa làm)
+- **Bố cục tự do P2:** ảnh, hoạ tiết (đường kẻ, khung, tròn), 3 bố cục mẫu bấm một lần. **P3:** danh sách lớp, khoá phần tử.
 - Nút Google Calendar, nhắc nhở trong `.ics`, gợi ý "mở bằng trình duyệt" khi đang ở trong ứng dụng.
 - Nút dọn ảnh không dùng trong `uploads/`.
 - Ghi nhận khi người ấy bấm đồng ý (cần một nơi lưu có thể ghi từ phía người xem).

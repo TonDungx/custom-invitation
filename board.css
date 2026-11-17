@@ -1,0 +1,12 @@
+/* Free-layout board, shared by the invite and the admin editor so both render identically.
+   Items: centre at (cx%, cy%); width/font in "design px" scaled by --u (see REF in shared.js). */
+.board { position: relative; container-type: size; --rw: 390; --rh: 844; }
+.board[data-o="landscape"] { --rw: 1440; --rh: 900; }
+.board .it {
+  --u: min(100cqw / var(--rw), 100cqh / var(--rh));
+  position: absolute; left: calc(var(--cx) * 1%); top: calc(var(--cy) * 1%);
+  width: calc(var(--w) * var(--u));
+  transform: translate(-50%, -50%) rotate(calc(var(--rot) * 1deg));
+  opacity: var(--op);
+}
+.board .tx { font-size: calc(var(--fs) * var(--u)); white-space: pre-line; overflow-wrap: break-word; }

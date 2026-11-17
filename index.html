@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#F7F4EE">
 <title>Một lời mời</title>
 <link rel="preconnect" href="https://api.github.com" crossorigin>
+<link rel="stylesheet" href="board.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
@@ -103,11 +104,12 @@ section + section { border-top: 1px solid var(--line); }
 .has-bg .backdrop { display: block; }
 .has-bg .backdrop::before, .has-bg .cover::before {
   content: ""; position: absolute; inset: calc(var(--blur, 0px) * -2); z-index: -2;
-  background: var(--bg-img, none) center / cover no-repeat; filter: blur(var(--blur, 0px));
-  transform: scale(1.08); opacity: 0; transition: transform 2.6s var(--ease), opacity 1.2s var(--ease);
+  background: var(--bg-img, none) var(--bgx, 50%) var(--bgy, 50%) / cover no-repeat; filter: blur(var(--blur, 0px));
+  transform-origin: var(--bgx, 50%) var(--bgy, 50%);
+  transform: scale(calc(var(--bgz, 1) * 1.08)); opacity: 0; transition: transform 2.6s var(--ease), opacity 1.2s var(--ease);
 }
 .has-bg .backdrop::after, .has-bg .cover::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--bg); opacity: var(--dim, .7); }
-.ready .backdrop::before, .ready .cover::before { transform: none; opacity: 1; }
+.ready .backdrop::before, .ready .cover::before { transform: scale(var(--bgz, 1)); opacity: 1; }
 .has-bg .cover { background: transparent; isolation: isolate; overflow: hidden; }
 .has-bg section + section, .has-bg footer { border-color: color-mix(in srgb, var(--fg) 12%, transparent); }
 
@@ -131,6 +133,17 @@ section + section { border-top: 1px solid var(--line); }
 
 /* Letter */
 .letter { min-height: 100svh; display: grid; align-content: center; }
+
+/* Free layout: one full-screen board per orientation (styles of items in board.css).
+   No landscape design yet -> the portrait board is shown centred at its reference ratio. */
+.board-wrap { padding: 0; height: 100svh; display: grid; place-items: center; overflow: hidden; }
+.board-wrap .board { width: 100%; height: 100%; }
+.board-wrap .board[data-o="landscape"] { display: none; }
+@media (orientation: landscape) {
+  .board-wrap .board[data-o="portrait"] { width: auto; aspect-ratio: 390 / 844; }
+  .board-wrap.has-land .board[data-o="portrait"] { display: none; }
+  .board-wrap.has-land .board[data-o="landscape"] { display: block; }
+}
 .letter .msg { margin-top: 2rem; white-space: pre-line; color: var(--muted); font-size: 1.05rem; }
 .sign { margin-top: 2.5rem; font-size: 1.6rem; }
 
@@ -234,6 +247,7 @@ function render() {
   const dateText = valid ? `${pad(d.getDate())} · ${pad(d.getMonth() + 1)} · ${d.getFullYear()}` : '';
   const timeText = valid ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
   const reply = safeUrl(cfg.reply);
+  const free = freeLayout(cfg);
   document.title = `Gửi ${cfg.to}`;
 
   $('#cover').innerHTML = `
@@ -246,13 +260,16 @@ function render() {
     </div>`;
 
   $('#app').innerHTML = `
-    <section class="letter"><div class="wrap">
+    ${free ? `<section class="board-wrap${free.landscape?.items?.length ? ' has-land' : ''}">
+      ${['portrait', 'landscape'].filter(o => free[o]?.items?.length).map(o =>
+        `<div class="board" data-o="${o}">${boardItemsHTML(cfg, free[o].items, { fmt: words, reveal: true })}</div>`).join('')}
+    </section>` : `<section class="letter"><div class="wrap">
       <p class="eyebrow" data-r>Gửi ${esc(cfg.to)},</p>
       <h2 class="display words" data-r style="margin-top:1.5rem;--d:1">${words(cfg.title)}</h2>
       <div class="rule" data-r style="--d:3"></div>
       <p class="msg" data-r style="--d:4">${esc(cfg.message)}</p>
       <p class="sign italic" data-r style="--d:5">— ${esc(cfg.from)}</p>
-    </div></section>
+    </div></section>`}
 
     ${valid ? `<section class="when"><div class="wrap">
       <p class="eyebrow" data-r>Thời gian</p>

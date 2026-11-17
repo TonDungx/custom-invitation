@@ -19,7 +19,7 @@ Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã c
 
 ## Cách hoạt động
 
-- **Server tĩnh** viết bằng `node:http` ở cổng 5178, phục vụ thư mục dự án. Đường dẫn là thư mục thì trả `index.html` (giống cách Vercel và Netlify phục vụ `/admin`).
+- **Server tĩnh** viết bằng `node:http` ở cổng 5178. Phải trả đúng `Content-Type` cho `.css`: trình duyệt bỏ qua stylesheet có kiểu `text/plain` (từng làm vỡ toàn bộ trang thiết kế trong test), phục vụ thư mục dự án. Đường dẫn là thư mục thì trả `index.html` (giống cách Vercel và Netlify phục vụ `/admin`).
 - **GitHub API giả lập** bằng `ctx.route('https://api.github.com/**')`:
 
   | Request | Phản hồi giả |
@@ -66,6 +66,19 @@ Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã c
 | **Bốc hơi:** 1 lần bấm, nút bị xoá, hạt tự dọn | Chế độ vanish |
 | **Ẩn nút:** không có nút từ chối | Chế độ off |
 | Đồng hồ đếm ngược có số khác 0 | Đếm ngược. Ngày test luôn ở năm sau nên assert này không hết hạn. |
+| **Thiết kế:** ẩn khi ở bố cục mẫu; bật Tự thiết kế có 5 khối mặc định | Chuyển chế độ |
+| Kéo lệch 3px thì bị hít vào gióng hoặc mép gần nhất; giữ Alt thì kéo tự do | Hít dính |
+| Kéo cạnh phải: rộng ra, tâm dịch sang phải | Co giãn cạnh |
+| Kéo góc: cỡ chữ tăng | Co giãn góc |
+| Kéo chấm xoay sang phải tâm: đúng 90° | Xoay và hít góc |
+| Bấm cỡ gợi ý 41.9 (16·φ²) | Thang tỷ lệ vàng |
+| Ctrl+Z, Ctrl+Shift+Z, Delete, Ctrl+Z | Lịch sử, phím tắt |
+| Chữ tự do `<img onerror>` hiện thành chữ trên thiệp | XSS |
+| Tạo bản ngang từ bản dọc → 6 phần tử | Bản ngang |
+| Lưu → `layout.mode = free`, đủ 2 bản | Lưu |
+| Điện thoại 390×844: bản dọc phủ kín, tâm phần tử đúng (cx%, cy%) trong 2px | Hiển thị |
+| Laptop 1280×800: hiện bản ngang | Chọn bản theo hướng |
+| Laptop khi chưa có bản ngang: bản dọc ở giữa, tỷ lệ 390:844 | Dự phòng |
 | Không có `pageerror` nào ở mọi trang | Lỗi runtime |
 
 Các chế độ smoke, vanish, off được nạp bằng hash: gọi `pack({...DEFAULT, declineMode})` ngay trong trang admin, giống cách khung xem trước làm.

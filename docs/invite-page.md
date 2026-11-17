@@ -28,6 +28,15 @@ Easing dùng chung:
   - Bản cũ dùng khung che cho cả khối chữ, khiến dòng thứ 2 bị cắt ngang giữa chừng và dấu tiếng Việt có thể bị xén. Hiện mỗi chữ là một `inline-block` riêng, không có khung che.
   - Cũng áp dụng cho tên trên phong thư và câu hỏi ở phần Hồi đáp.
 
+### 2b. Trang tự thiết kế (khi `layout.mode = "free"`)
+- Thay cho phần Lời nhắn bằng `<section class="board-wrap">` cao `100svh`, chứa một `.board` cho mỗi hướng màn hình.
+- **Màn hình dọc:** hiện bản dọc, phủ kín màn hình.
+- **Màn hình ngang:** có bản ngang thì hiện bản ngang. Chưa có thì hiện bản dọc ở giữa với tỷ lệ 390:844, cao bằng màn hình.
+- Chuyển giữa hai bản hoàn toàn bằng CSS `@media (orientation)`, nên xoay máy là đổi ngay.
+- Style phần tử nằm trong [board.css](../board.css): `left/top = cx%/cy%`, `translate(-50%,-50%) rotate()`, `width` và `font-size` theo `--u = min(100cqw/390, 100cqh/844)` (container query units).
+- **Hiệu ứng:** mỗi khối hiện từng chữ như tiêu đề bố cục mẫu, các khối nối nhau theo thứ tự đọc (trên xuống, trái sang), lệch 120ms.
+- Thứ tự trong DOM là thứ tự đọc, giúp trình đọc màn hình đọc đúng. Thứ tự lớp dùng `z-index`.
+
 ## 3. Thời gian
 - Ngày cỡ lớn (`clamp(6rem, 30vw, 9.5rem)`), "Tháng M · YYYY", thứ và giờ in nghiêng (`Intl.DateTimeFormat('vi-VN', { weekday: 'long' })`, ví dụ "Thứ Năm").
 - **Đếm ngược:** Ngày, Giờ, Phút, Giây, cập nhật mỗi giây, dùng `tabular-nums` để số không nhảy độ rộng. Đến giờ hẹn thì ẩn ô đếm ngược.
@@ -90,6 +99,7 @@ Không có nhắc nhở (`VALARM`). Mỗi thiết bị xử lý file khác nhau:
 - `::before` là ảnh (`background-size: cover`, `filter: blur(var(--blur))`, mở rộng ra ngoài `2 × blur` để mép không bị nhạt). `::after` là lớp màu nền theme với `opacity: var(--dim)`.
 - Khi hiện: ảnh phóng nhẹ từ 1.08 về 1 trong 2.6s, mờ dần vào trong 1.2s.
 - Phong thư dùng đúng các lớp này, nên lúc phong thư tan, nền không đổi.
+- **Điểm lấy nét và phóng to:** `background-position` và `transform-origin` = (`bgX`%, `bgY`%), `transform: scale(bgZoom/100)`.
 - **Kích thước ảnh tải về:** ảnh Unsplash có `w = ceil(innerWidth × devicePixelRatio / 480) × 480`, tối đa 2400. Có làm mờ thì chia 960 (nửa độ phân giải, vì chi tiết đã bị mờ đi).
 - Ảnh được `decode()` xong mới gán, nên không có cảnh ảnh hiện từng phần.
 

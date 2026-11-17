@@ -25,6 +25,10 @@ const DEFAULT = {
   bg: '',      // '' | preset key | custom https URL
   bgDim: 70,   // % of theme colour laid over the photo (keeps text readable)
   bgBlur: 0,   // 0-100 %
+  bgX: 50,     // background focal point, % (CSS background-position)
+  bgY: 50,
+  bgZoom: 100, // 100-300 %
+  layout: null, // free layout, see "Free layout" below; null = template layout
 };
 
 // Free photos (Unsplash License), verified by hand for the date-night mood.
@@ -109,6 +113,68 @@ async function readConfig(localUrl) {
   return D;
 }
 
+// ---- Date parts (shared by the template layout and free-layout fields) ----
+function dateParts(s) {
+  const d = new Date(s), pad = n => String(n).padStart(2, '0');
+  if (isNaN(d)) return { valid: false, d };
+  return { valid: true, d, dd: pad(d.getDate()), mm: pad(d.getMonth() + 1), yyyy: d.getFullYear(),
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    weekday: new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(d) };
+}
+
+// ---- Free layout ("Tự thiết kế") ----
+// layout = { mode: 'template'|'free', portrait: { items } | null, landscape: { items } | null }
+// Item position = centre in % of the screen (cx, cy). Size + font size = "design px" of a
+// reference screen (REF), rendered with --u = min(100cqw / refW, 100cqh / refH):
+// a shorter screen shrinks text by the same factor as the vertical spacing -> never overlaps.
+const REF = { portrait: [390, 844], landscape: [1440, 900] };
+// Composition guides in % (both axes). "golden" = 1/φ² and 1/φ.
+const GUIDES = { thirds: [100 / 3, 200 / 3], golden: [38.197, 61.803], safe: [8, 92] };
+// Modular type scales: font sizes on base·ratioⁿ relate harmoniously.
+const SCALES = { 1.25: 'Major third 1.25', 1.333: 'Perfect fourth 1.333', 1.618: 'Tỷ lệ vàng 1.618' };
+// Content blocks bound to form fields (label, text getter).
+const FIELDS = {
+  greeting: ['Lời chào', c => `Gửi ${c.to},`],
+  to:       ['Tên người nhận', c => c.to],
+  title:    ['Tiêu đề', c => c.title],
+  message:  ['Lời nhắn', c => c.message],
+  sign:     ['Chữ ký', c => `— ${c.from}`],
+  date:     ['Ngày', c => { const p = dateParts(c.date); return p.valid ? `${p.dd} · ${p.mm} · ${p.yyyy}` : ''; }],
+  when:     ['Thứ & giờ', c => { const p = dateParts(c.date); return p.valid ? `${p.weekday}, ${p.time}` : ''; }],
+};
+const ALIGN = ['left', 'center', 'right'], COLORS = ['fg', 'muted', 'accent'];
+
+// Starting point when the user first switches to "Tự thiết kế": mirrors the template letter.
+function defaultPortrait() {
+  const t = (id, field, cy, w, fs, o = {}) => ({ id, type: 'field', field, cx: 50, cy, w, fs, rot: 0, font: 'display', align: 'center', color: 'fg', lh: 1.25, ...o });
+  return { items: [
+    t('greeting', 'greeting', 24, 320, 12, { font: 'body', caps: true, ls: .28, color: 'muted' }),
+    t('title', 'title', 36, 340, 46, { lh: 1.08 }),
+    t('message', 'message', 55, 310, 16, { font: 'body', color: 'muted', lh: 1.75 }),
+    t('sign', 'sign', 69, 300, 26, { italic: true }),
+    t('date', 'date', 80, 300, 12, { font: 'body', ls: .28, color: 'muted' }),
+  ] };
+}
+
+const num = (v, lo, hi, dflt) => { v = +v; return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : dflt; };
+function itemText(cfg, it) { return it.type === 'field' ? (FIELDS[it.field]?.[1](cfg) ?? '') : String(it.text ?? ''); }
+// Inline style from an item. Every value is coerced/whitelisted (config is user data).
+function itemStyle(it, z) {
+  return `--cx:${num(it.cx, -50, 150, 50)};--cy:${num(it.cy, -50, 150, 50)};--w:${num(it.w, 4, 4000, 200)};` +
+    `--fs:${num(it.fs, 4, 800, 16)};--rot:${num(it.rot, -360, 360, 0)};--op:${num(it.op ?? 100, 0, 100, 100) / 100};z-index:${z};` +
+    `text-align:${ALIGN.includes(it.align) ? it.align : 'center'};color:var(--${COLORS.includes(it.color) ? it.color : 'fg'});` +
+    `font-family:var(--${it.font === 'body' ? 'body' : 'display'});font-style:${it.italic ? 'italic' : 'normal'};` +
+    `text-transform:${it.caps ? 'uppercase' : 'none'};letter-spacing:${num(it.ls, -.1, 1, 0)}em;line-height:${num(it.lh, .8, 3, 1.25)}`;
+}
+// Items HTML in reading order (top→bottom, left→right) for accessibility; z-index keeps layer order.
+// opts.fmt(text) -> inner HTML (escaped!). opts.reveal adds the word-by-word reveal hooks.
+function boardItemsHTML(cfg, items, { fmt = esc, reveal = false } = {}) {
+  return items.map((it, z) => [it, z]).sort((a, b) => a[0].cy - b[0].cy || a[0].cx - b[0].cx)
+    .map(([it, z], i) => `<div class="it" data-id="${esc(it.id)}" style="${itemStyle(it, z)}">` +
+      `<div class="tx${reveal ? ' words' : ''}"${reveal ? ` data-r style="--d:${i + 1}"` : ''}>${fmt(itemText(cfg, it))}</div></div>`).join('');
+}
+const freeLayout = cfg => cfg.layout?.mode === 'free' && cfg.layout.portrait?.items?.length ? cfg.layout : null;
+
 // Sets theme tokens + loads the display font. Resolves once the font is usable.
 function applyStyle(cfg) {
   const t = THEMES[cfg.theme] || THEMES.ivory, f = FONTS[cfg.font] || FONTS.cormorant, r = document.documentElement.style;
@@ -135,6 +201,9 @@ function applyBackground(cfg, r) {
   const url = bgUrl(cfg.bg, w);
   r.setProperty('--dim', Math.min(95, Math.max(0, cfg.bgDim ?? 70)) / 100);
   r.setProperty('--blur', blur + 'px');
+  r.setProperty('--bgx', num(cfg.bgX, 0, 100, 50) + '%');
+  r.setProperty('--bgy', num(cfg.bgY, 0, 100, 50) + '%');
+  r.setProperty('--bgz', num(cfg.bgZoom, 100, 300, 100) / 100);
   document.documentElement.classList.toggle('has-bg', !!url);
   if (!url) { r.removeProperty('--bg-img'); return Promise.resolve(); }
   const img = new Image(); img.src = url;

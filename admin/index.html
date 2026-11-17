@@ -120,6 +120,58 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 .sliders:disabled { opacity: .4; }
 .sliders output { color: var(--fg); letter-spacing: 0; margin-left: .25rem; }
 input[type=range] { width: 100%; min-height: 2.75rem; accent-color: var(--fg); cursor: pointer; }
+/* Background focal point */
+.focal { position: relative; margin-top: .4rem; max-width: 220px; cursor: crosshair; touch-action: none; border: 1px solid var(--line); line-height: 0; }
+.focal img { width: 100%; height: auto; display: block; }
+.focal i { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.35); pointer-events: none; }
+
+/* Free-layout designer */
+.editor .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); }
+.editor .seg button { min-height: 2.5rem; min-width: 2.5rem; padding: 0 .8rem; border: 0; background: none; font: inherit; font-size: .85rem; color: var(--muted); cursor: pointer; transition: background-color .2s, color .2s; }
+.editor .seg button + button { border-left: 1px solid var(--line); }
+.editor .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.editor .seg button:disabled { opacity: .35; cursor: default; }
+.ed-bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: 1rem; }
+.ed-bar select, .ed-props select { min-height: 2.5rem; padding: 0 .6rem; font: inherit; font-size: .85rem; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--fg); }
+.ed-empty { padding: 2rem; border: 1px dashed var(--line); text-align: center; color: var(--muted); display: grid; gap: 1rem; justify-items: center; }
+.ed-stage { display: grid; place-items: center; padding: 1.25rem; background: repeating-conic-gradient(#efebe4 0 25%, #f6f3ee 0 50%) 0 0 / 16px 16px; border: 1px solid var(--line); }
+.ed-stage .board { overflow: visible; outline: none; touch-action: none; user-select: none; box-shadow: 0 20px 50px -20px rgba(28,25,23,.35); isolation: isolate; }
+.ed-stage .board[data-o="portrait"] { height: min(70vh, 680px); aspect-ratio: 390 / 844; }
+.ed-stage .board[data-o="landscape"] { width: 100%; aspect-ratio: 1440 / 900; }
+.ed-stage .board::before { content: ""; position: absolute; inset: calc(var(--bblur) * -2); z-index: -2; background: var(--bimg) var(--bx) var(--by) / cover no-repeat; filter: blur(var(--bblur)); transform: scale(var(--bz)); transform-origin: var(--bx) var(--by); clip-path: inset(calc(var(--bblur) * 2)); }
+.ed-stage .board::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--bg); opacity: var(--bdim); }
+.ed-stage .board:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+.board .it { cursor: move; }
+.board .it:hover { outline: 1px dashed color-mix(in srgb, #3b82f6 60%, transparent); outline-offset: 2px; }
+/* Guides (persistent, faint) and snap lines (while dragging) */
+.board .gl { position: absolute; pointer-events: none; z-index: 900; }
+.board .gl.v { top: 0; bottom: 0; width: 0; border-left: 1px dashed; }
+.board .gl.h { left: 0; right: 0; height: 0; border-top: 1px dashed; }
+.board .gl.thirds { color: rgba(59,130,246,.35); }
+.board .gl.golden { color: rgba(201,169,110,.7); }
+.board .gl.safe { color: rgba(239,68,68,.3); }
+.board .gl.center { color: rgba(127,127,127,.18); }
+.board .ed-snap i { position: absolute; z-index: 950; pointer-events: none; background: #ec4899; }
+.board .ed-snap i.v { top: 0; bottom: 0; width: 1px; }
+.board .ed-snap i.h { left: 0; right: 0; height: 1px; }
+/* Selection frame + handles */
+.board .ed-sel { position: absolute; z-index: 1000; pointer-events: none; outline: 1px solid #3b82f6; }
+.board .ed-sel b { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; background: #fff; border: 1px solid #3b82f6; pointer-events: auto; }
+.board .ed-sel b[data-h="w"] { left: 0; top: 50%; cursor: ew-resize; height: 18px; margin-top: -9px; width: 6px; margin-left: -3px; border-radius: 3px; }
+.board .ed-sel b[data-h="e"] { left: 100%; top: 50%; cursor: ew-resize; height: 18px; margin-top: -9px; width: 6px; margin-left: -3px; border-radius: 3px; }
+.board .ed-sel b[data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.board .ed-sel b[data-h="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
+.board .ed-sel b[data-h="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+.board .ed-sel b[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+.board .ed-sel b[data-h="rot"] { left: 50%; top: -28px; border-radius: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; cursor: grab; }
+.board .ed-sel b[data-h="rot"]::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 16px; background: #3b82f6; }
+.ed-tip { margin: .75rem 0 1.25rem; }
+.ed-props { padding: 1.25rem; background: var(--panel); border: 1px solid var(--line); }
+.ed-props .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+.ed-props .chips button { min-height: 2.25rem; min-width: 2.75rem; padding: 0 .6rem; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); font: inherit; font-size: .8rem; cursor: pointer; font-variant-numeric: tabular-nums; }
+.ed-props .chips button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.ed-props output { color: var(--fg); letter-spacing: 0; margin-left: .25rem; }
+.ed-actions { display: flex; flex-wrap: wrap; gap: .25rem; border-top: 1px solid var(--line); padding-top: .75rem; }
 .check { display: flex; align-items: center; gap: .6rem; cursor: pointer; min-height: 2.75rem; }
 .check input { width: 18px; height: 18px; accent-color: var(--fg); }
 
@@ -147,6 +199,8 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, ::backdrop { transition-duration: .01ms !important; animation: none !important; } }
 </style>
 <script src="../shared.js"></script>
+<script src="editor.js"></script>
+<link rel="stylesheet" href="../board.css">
 </head>
 <body>
 <header>
@@ -163,6 +217,7 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
   <nav aria-label="Mục lục">
     <ol>
       <li><a href="#s-invite">Lời mời</a></li>
+      <li id="navDesign" hidden><a href="#s-design">Thiết kế</a></li>
       <li><a href="#s-time">Thời gian</a></li>
       <li><a href="#s-stops">Lịch trình</a></li>
       <li><a href="#s-rsvp">Hồi đáp</a></li>
@@ -180,7 +235,20 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
         <label><span class="lbl">Ký tên</span><input name="from" required maxlength="40"></label>
         <label class="full"><span class="lbl">Tiêu đề</span><input name="title" maxlength="80"></label>
         <label class="full"><span class="lbl">Lời nhắn</span><textarea name="message" maxlength="600"></textarea></label>
+        <div class="full">
+          <p class="lbl" style="margin-bottom:.6rem">Bố cục trang lời nhắn</p>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="layoutMode" value="template"><span>Bố cục mẫu</span></label>
+            <label class="choice"><input type="radio" name="layoutMode" value="free"><span>Tự thiết kế (kéo thả)</span></label>
+          </div>
+        </div>
       </div>
+    </fieldset>
+
+    <fieldset id="s-design" hidden>
+      <legend>Thiết kế</legend>
+      <p class="hint" style="margin-bottom:1rem">Nội dung lấy từ mục Lời mời và Thời gian. Mỗi bản lấp đầy màn hình người xem: <b>Dọc</b> cho điện thoại, <b>Ngang</b> cho laptop và PC.</p>
+      <div id="editor" class="editor"></div>
     </fieldset>
 
     <fieldset id="s-time">
@@ -239,6 +307,11 @@ dialog .row { display: flex; justify-content: flex-end; gap: .5rem; }
       <fieldset class="grid sliders" id="bgOpts" style="margin-top:1.5rem">
         <label><span class="lbl">Độ phủ màu nền <output name="dimOut"></output></span><input type="range" name="bgDim" min="0" max="95" step="5"><span class="hint">Cao hơn → chữ dễ đọc hơn.</span></label>
         <label><span class="lbl">Làm mờ <output name="blurOut"></output></span><input type="range" name="bgBlur" min="0" max="100" step="5"><span class="hint">0% là không làm mờ.</span></label>
+        <div><span class="lbl">Điểm lấy nét</span>
+          <div class="focal" id="focal" title="Kéo chấm tới phần ảnh muốn giữ trong khung"><img alt="" id="focalImg"><i></i></div>
+          <span class="hint">Kéo chấm tới phần ảnh muốn giữ khi màn hình cắt bớt ảnh.</span>
+          <input type="hidden" name="bgX"><input type="hidden" name="bgY"></div>
+        <label><span class="lbl">Phóng to <output name="zoomOut"></output></span><input type="range" name="bgZoom" min="100" max="300" step="5"><span class="hint">Phóng quanh điểm lấy nét.</span></label>
       </fieldset>
       <p class="hint" style="margin-top:1rem">Ảnh gợi ý từ <a href="https://unsplash.com/license" target="_blank" rel="noopener">Unsplash</a>, miễn phí sử dụng.</p>
     </fieldset>
@@ -318,8 +391,36 @@ function syncBg() {
   e.blurOut.value = e.bgBlur.value + '%';
   $('#declineHint').textContent = DECLINE_HINT[e.declineMode.value] || '';
   e.decline.disabled = e.declineMode.value === 'off';
+  // Focal point: show the chosen photo with a draggable dot.
+  e.zoomOut.value = e.bgZoom.value + '%';
+  const src = bgUrl(v === 'custom' ? e.bgUrl.value : v === 'none' ? '' : v, 480);
+  if ($('#focalImg').getAttribute('src') !== src) $('#focalImg').src = src;
+  $('#focal').hidden = !src;
+  Object.assign($('#focal i').style, { left: e.bgX.value + '%', top: e.bgY.value + '%' });
+  // Layout mode: show the designer only in "Tự thiết kế".
+  const free = e.layoutMode.value === 'free';
+  if ($('#s-design').hidden === free) {
+    $('#s-design').hidden = $('#navDesign').hidden = !free;
+    if (free) { ed.ensurePortrait(); ed.refresh(); }
+  }
 }
 f.addEventListener('input', syncBg);
+
+$('#focal').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const box = $('#focal'), set = ev => {
+    const r = box.getBoundingClientRect(), c = v => Math.round(Math.min(100, Math.max(0, v)));
+    f.elements.bgX.value = c((ev.clientX - r.left) / r.width * 100);
+    f.elements.bgY.value = c((ev.clientY - r.top) / r.height * 100);
+    f.dispatchEvent(new Event('input')); // same path as typing: sync UI + debounced preview
+  };
+  box.setPointerCapture(e.pointerId); set(e);
+  box.onpointermove = set;
+  box.addEventListener('lostpointercapture', () => box.onpointermove = null, { once: true });
+});
+
+// Free-layout designer (admin/editor.js). Its own inputs don't bubble to the form.
+const ed = createEditor({ mount: $('#editor'), getCfg: () => read(), onChange: () => update() });
 
 function addStop(s = {}) {
   const row = $('#tpl').content.firstElementChild.cloneNode(true);
@@ -336,8 +437,13 @@ function fill(c) {
   f.elements.declineMode.value = c.declineMode || DEFAULT.declineMode;
   f.elements.bgDim.value = c.bgDim ?? DEFAULT.bgDim;
   f.elements.bgBlur.value = c.bgBlur ?? DEFAULT.bgBlur;
+  f.elements.bgX.value = c.bgX ?? 50; f.elements.bgY.value = c.bgY ?? 50; f.elements.bgZoom.value = c.bgZoom ?? 100;
+  f.elements.layoutMode.value = c.layout?.mode === 'free' ? 'free' : 'template';
+  ed.set(c.layout);
+  $('#s-design').hidden = $('#navDesign').hidden = f.elements.layoutMode.value !== 'free';
   stops.replaceChildren(); (c.stops || []).forEach(addStop);
   syncBg();
+  if (!$('#s-design').hidden) ed.refresh();
 }
 function read() {
   const c = {};
@@ -347,6 +453,9 @@ function read() {
   const bg = f.elements.bg.value;
   c.bg = bg === 'custom' ? f.elements.bgUrl.value.trim() : bg === 'none' ? '' : bg;
   c.bgDim = +f.elements.bgDim.value; c.bgBlur = +f.elements.bgBlur.value;
+  c.bgX = +f.elements.bgX.value; c.bgY = +f.elements.bgY.value; c.bgZoom = +f.elements.bgZoom.value;
+  const l = ed.get();
+  c.layout = l.portrait || l.landscape || f.elements.layoutMode.value === 'free' ? { mode: f.elements.layoutMode.value, ...l } : null;
   c.stops = [...stops.children].map(r => Object.fromEntries([...r.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value.trim()])))
     .filter(s => s.name || s.time);
   return c;
@@ -365,7 +474,10 @@ async function update() {
   $('#pv').src = '../index.html#' + await pack(read()); // fragment change -> no reload
   refreshState();
 }
-let t; f.addEventListener('input', () => { clearTimeout(t); t = setTimeout(update, 200); });
+let t; f.addEventListener('input', () => {
+  clearTimeout(t);
+  t = setTimeout(() => { if (!$('#s-design').hidden) ed.refresh(); update(); }, 200); // form text -> designer texts
+});
 addEventListener('beforeunload', e => { if (dirty()) e.preventDefault(); });
 
 function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el.t); el.t = setTimeout(() => el.classList.remove('show'), 2600); }

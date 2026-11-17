@@ -52,6 +52,25 @@ Khai báo biến và hàm global (không dùng module, để cả hai trang ch�
 | `loadFont(f)` | fn → Promise | Một thẻ `<link id="font">` cho font tiêu đề và Be Vietnam Pro. Chờ `document.fonts.load`. |
 | `applyBackground(cfg, r)` | fn → Promise | Đặt `--dim`, `--blur`, `--bg-img`, class `has-bg`. Decode ảnh trước khi gán để không bị "nhảy" ảnh. |
 
+| `dateParts(s)` | fn | Tách ngày giờ thành `dd, mm, yyyy, time, weekday`, kèm cờ `valid` |
+| `REF`, `GUIDES`, `SCALES`, `FIELDS` | const | Màn hình chuẩn của bố cục tự do; đường gióng (một phần ba, vàng, lề); thang cỡ chữ; các khối thông tin liên kết với form |
+| `defaultPortrait()` | fn | Bản dọc mặc định khi bật "Tự thiết kế" (mô phỏng bố cục mẫu) |
+| `itemStyle(it, z)` | fn | Biến phần tử thành inline style. **Mọi giá trị đều được ép kiểu, giới hạn hoặc lọc theo danh sách cho phép** (dữ liệu từ config). |
+| `boardItemsHTML(cfg, items, {fmt, reveal})` | fn | HTML các phần tử theo thứ tự đọc. Admin truyền `fmt = esc`, trang thiệp truyền `fmt = words` và bật hiệu ứng. |
+| `freeLayout(cfg)` | fn | Trả về `layout` nếu đang ở chế độ tự do và có bản dọc, ngược lại `null` |
+
+### `board.css`
+Style dùng chung cho `.board` và `.it`, để trang thiệp và trình chỉnh sửa hiển thị giống hệt nhau.
+
+### `admin/editor.js`
+`createEditor({ mount, getCfg, onChange })` trả về `{ set(layout), get(), ensurePortrait(), refresh() }`.
+- Vẽ bằng chính `boardItemsHTML` và `board.css`. Theme, font, ảnh nền của thiệp được gán lên `.board` để đúng WYSIWYG.
+- Kéo, co giãn, xoay bằng Pointer Events cùng `setPointerCapture`. Trong lúc kéo chỉ đổi inline style của một phần tử (`paint`); thả tay mới `commit` (vẽ lại và báo `onChange`).
+- Hít dính: so mép trái, tâm, mép phải (và mép trên, tâm, mép dưới) của phần tử đang kéo với đường gióng và mép, tâm của các phần tử khác, ngưỡng 6px.
+- Co giãn cạnh tính theo trục đã xoay của phần tử. Góc phóng to quanh tâm.
+- Lịch sử: mảng ảnh chụp JSON, tối đa 100 bước.
+- Sự kiện `input` và `change` bên trong editor bị chặn lan ra form admin.
+
 ### `index.html` (trang thiệp)
 CSS inline trong `<style>`, JS inline trong `<script type="module">`. Các hàm chính:
 

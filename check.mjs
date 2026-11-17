@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.OUT || os.tmpdir();
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css' };
 const srv = http.createServer((q, r) => {
   let f = path.join(ROOT, decodeURIComponent(new URL(q.url, 'http://x').pathname));
   if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
@@ -199,6 +199,107 @@ for (const mode of ['smoke', 'vanish']) {
 
 const cnt = await m.$$eval('#count b', b => b.map(x => x.textContent));
 assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
+
+// ---------- Free layout designer ("Tự thiết kế") ----------
+{
+  const a = await ctx.newPage(); await a.setViewportSize({ width: 1440, height: 900 });
+  a.on('pageerror', e => errors.push('designer: ' + e.message));
+  await a.goto(BASE + 'admin/'); await a.waitForSelector('#status:has-text("Đã lưu")');
+  assert.ok(await a.locator('#s-design[hidden]').count(), 'designer hidden in template mode');
+  await a.check('[name=layoutMode][value=free]', { force: true }); await a.waitForTimeout(400);
+  assert.ok(await a.isVisible('#s-design'), 'designer shown in free mode');
+  assert.equal(await a.locator('.board .it').count(), 5, 'default portrait has 5 blocks');
+  await a.locator('#s-design').scrollIntoViewIfNeeded();
+  // Read the title item back from what is rendered (its inline CSS variables).
+  const title = () => a.evaluate(() => {
+    const el = document.querySelector('.board .it[data-id=title]');
+    if (!el) return undefined;
+    const g = k => +el.style.getPropertyValue('--' + k);
+    return { cx: g('cx'), cy: g('cy'), w: g('w'), fs: g('fs'), rot: g('rot') };
+  });
+  const box = sel => a.locator(sel).boundingBox();
+  const drag = async (sel, dx, dy, opts = {}) => {
+    const b = await box(sel); const x = b.x + b.width / 2, y = b.y + b.height / 2;
+    if (opts.alt) await a.keyboard.down('Alt');
+    await a.mouse.move(x, y); await a.mouse.down(); await a.mouse.move(x + dx, y + dy, { steps: 6 }); await a.mouse.up();
+    if (opts.alt) await a.keyboard.up('Alt');
+    await a.waitForTimeout(150);
+  };
+  // Move: a small nudge snaps back to the vertical centre line; Alt disables snapping.
+  const bw = (await box('.ed-stage .board')).width;
+  await drag('.board .it[data-id=title]', 3, 0);
+  const raw = 50 + 3 / bw * 100, snapped = (await title()).cx;
+  assert.ok(Math.abs(snapped - raw) > .1, `snaps to the nearest guide or edge (raw ${raw.toFixed(2)} -> ${snapped})`);
+  await drag('.board .it[data-id=title]', 40, 0, { alt: true });
+  const moved = await title();
+  assert.ok(moved.cx > 55, 'Alt-drag moves freely: ' + moved.cx);
+  // Resize right edge: wider, centre shifts right by half the growth.
+  const w0 = moved.w;
+  await drag('.ed-sel b[data-h=e]', 30, 0);
+  const rs = await title();
+  assert.ok(rs.w > w0 + 10 && rs.cx > moved.cx, 'edge resize widens and shifts centre');
+  // Corner scales the font size.
+  const fs0 = rs.fs;
+  await drag('.ed-sel b[data-h=se]', 40, 40);
+  assert.ok((await title()).fs > fs0, 'corner scales text');
+  // Rotate: drag the knob to the right of the centre -> ~90°, snapped exactly.
+  const it = await box('.board .it[data-id=title]'), knob = await box('.ed-sel b[data-h=rot]');
+  await a.mouse.move(knob.x + 7, knob.y + 7); await a.mouse.down();
+  await a.mouse.move(it.x + it.width / 2 + 200, it.y + it.height / 2 + 1, { steps: 8 }); await a.mouse.up();
+  assert.equal((await title()).rot, 90, 'rotation snaps to 90°');
+  // Modular scale chip (golden): 16·φ² = 41.9.
+  await a.click('.ed-props [data-fs="41.9"]');
+  assert.equal((await title()).fs, 41.9, 'scale chip sets size');
+  // Undo / redo / delete via keyboard.
+  await a.locator('.board').focus();
+  await a.keyboard.press('Control+z'); assert.notEqual((await title()).fs, 41.9, 'undo');
+  await a.keyboard.press('Control+Shift+z'); assert.equal((await title()).fs, 41.9, 'redo');
+  await a.keyboard.press('Delete'); assert.equal(await title(), undefined, 'delete');
+  await a.keyboard.press('Control+z'); assert.ok(await title(), 'undo delete');
+  // Free text with markup stays text.
+  await a.selectOption('.ed-add', 'text');
+  await a.fill('.ed-props [data-p=text]', '<img src=x onerror=alert(1)>Save the date');
+  await a.locator('.ed-props [data-p=text]').blur();
+  // Landscape: empty until generated from portrait.
+  await a.click('[data-orient=landscape]');
+  assert.ok(await a.isVisible('.ed-empty'), 'landscape empty state');
+  await a.click('[data-act=from-portrait]');
+  assert.equal(await a.locator('.board[data-o=landscape] .it').count(), 6, 'landscape generated from portrait');
+  await a.screenshot({ path: OUT + '/designer.png' });
+  // Save and render on real screens.
+  await a.click('#apply'); await a.waitForSelector('#status:has-text("Đã lưu")');
+  const saved = JSON.parse(stored).layout;
+  assert.equal(saved.mode, 'free'); assert.equal(saved.portrait.items.length, 6); assert.equal(saved.landscape.items.length, 6);
+  await a.close();
+
+  const show = async (w, h, o) => {
+    const v = await ctx.newPage(); await v.setViewportSize({ width: w, height: h });
+    v.on('pageerror', e => errors.push(`invite ${w}x${h}: ` + e.message));
+    await v.goto(BASE + (o ? '#' + o : '')); await v.waitForSelector('body.ready');
+    if (await v.isVisible('#open')) await v.click('#open');
+    await v.waitForTimeout(2600); return v;
+  };
+  // Phone portrait: portrait board fills the screen; title centre at (cx%, cy%) of the board.
+  let v = await show(390, 844);
+  assert.ok(await v.isVisible('.board[data-o=portrait]') && !(await v.isVisible('.board[data-o=landscape]')));
+  const pb = await v.locator('.board[data-o=portrait]').boundingBox();
+  assert.ok(Math.abs(pb.width - 390) < 1 && Math.abs(pb.height - 844) < 1, 'portrait board fills the phone');
+  const t = saved.portrait.items.find(i => i.id === 'title'), tb = await v.locator('.board[data-o=portrait] .it[data-id=title]').boundingBox();
+  assert.ok(Math.abs(tb.x + tb.width / 2 - t.cx / 100 * 390) < 2 && Math.abs(tb.y + tb.height / 2 - t.cy / 100 * 844) < 2, 'item centred at its saved position');
+  assert.equal(await v.locator('.board img').count(), 0, 'free text markup is escaped');
+  await v.screenshot({ path: OUT + '/free-phone.png' }); await v.close();
+  // Laptop landscape: landscape board.
+  v = await show(1280, 800);
+  assert.ok(await v.isVisible('.board[data-o=landscape]') && !(await v.isVisible('.board[data-o=portrait]')), 'landscape design on laptop');
+  await v.screenshot({ path: OUT + '/free-laptop.png' }); await v.close();
+  // No landscape design: laptop shows the portrait board centred at 390:844.
+  const p2 = await ctx.newPage(); await p2.goto(BASE + 'admin/'); await p2.waitForSelector('#pv');
+  const h2 = await p2.evaluate(l => pack({ ...DEFAULT, intro: false, layout: { mode: 'free', portrait: l.portrait, landscape: null } }), saved); await p2.close();
+  v = await show(1280, 800, h2);
+  const fb = await v.locator('.board[data-o=portrait]').boundingBox();
+  assert.ok(Math.abs(fb.width / fb.height - 390 / 844) < .01 && Math.abs(fb.x + fb.width / 2 - 640) < 2, 'portrait fallback centred at 390:844');
+  await v.close();
+}
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'all checks passed, no JS errors');
 await browser.close(); srv.close();

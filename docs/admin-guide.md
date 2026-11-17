@@ -42,6 +42,39 @@ Mở `https://tondungx.github.io/custom-invitation/admin`. Gõ `/admin` hay `/ad
 - **Tiêu đề:** dòng chữ lớn đầu thư. Tiêu đề hiện lần lượt từng chữ, nên câu ngắn 4–8 chữ trông đẹp nhất.
 - **Lời nhắn:** đoạn văn. **Enter** để xuống dòng, xuống dòng được giữ nguyên trên thiệp.
 
+- **Bố cục trang lời nhắn:** *Bố cục mẫu* (như cũ) hoặc *Tự thiết kế (kéo thả)*. Chọn Tự thiết kế thì hiện mục **Thiết kế** ngay bên dưới và trong mục lục.
+
+### Thiết kế (chế độ Tự thiết kế)
+Trang thiết kế hiển thị đúng như thiệp thật (theme, font, ảnh nền, lớp phủ). Nội dung vẫn sửa ở mục Lời mời và Thời gian, trang thiết kế tự cập nhật.
+
+**Thanh công cụ:**
+
+| Nút | Chức năng |
+|---|---|
+| Dọc / Ngang | Chuyển giữa bản cho điện thoại (390×844) và bản cho laptop, PC (1440×900). Mỗi bản lấp đầy màn hình người xem. |
+| + Thêm… | Thêm khối thông tin (Lời chào, Tên người nhận, Tiêu đề, Lời nhắn, Chữ ký, Ngày, Thứ & giờ) hoặc Chữ tự do, đặt ở giữa trang |
+| ⅓ | Lưới một phần ba (xanh), bật mặc định |
+| φ | Đường tỷ lệ vàng 38.2% / 61.8% (vàng) |
+| Lề | Lề an toàn 8% (đỏ nhạt), bật mặc định. Nên giữ chữ bên trong lề. |
+| ↶ ↷ | Hoàn tác, làm lại (Ctrl+Z, Ctrl+Shift+Z hoặc Ctrl+Y), tối đa 100 bước |
+
+**Thao tác trên trang:**
+- **Kéo phần tử** để di chuyển. Phần tử tự hít (trong 6px) vào: đường tâm, các đường gióng đang bật, mép trái, tâm, mép phải, mép trên, mép dưới của phần tử khác. Vạch hồng hiện ra khi hít. **Giữ Alt** để kéo tự do.
+- **Tay nắm hai bên:** đổi bề ngang, mép đối diện đứng yên.
+- **Tay nắm 4 góc:** phóng to, thu nhỏ cả cỡ chữ lẫn bề ngang quanh tâm.
+- **Chấm tròn phía trên:** xoay. Tự hít vào 0°, ±90°, ±180° (trong 3°). **Giữ Shift** để xoay theo bước 15°.
+- **Bàn phím** (khi trang thiết kế đang được chọn): mũi tên dịch 0.5% (Shift: 5%), Delete xoá, Ctrl+D nhân bản, Esc bỏ chọn.
+
+**Bảng thuộc tính** (khi chọn một phần tử): nội dung, font (tiêu đề hoặc thân bài), màu (chữ chính, chữ phụ, màu nhấn), cỡ chữ, **thang tỷ lệ** (1.25 / 1.333 / 1.618), **cỡ gợi ý theo thang** (bấm để chọn, gốc 16px; thang vàng: 6.1, 9.9, 16, 25.9, 41.9, 67.8…), bề ngang, góc xoay, giãn chữ, giãn dòng, độ đậm, căn lề, nghiêng, in hoa; các nút Căn giữa ngang, Đưa lên, Đưa xuống, Nhân bản, Xoá.
+
+**Bản ngang:** lúc đầu trống, màn hình ngang sẽ hiện bản dọc ở giữa đúng tỷ lệ. Bấm **Tạo bản ngang từ bản dọc** để sao chép (cỡ được nhân 900/844 để giữ nhịp dọc), rồi kéo lại cho hợp khổ ngang.
+
+**Gợi ý bố cục đẹp:**
+- Đặt điểm nhấn (tên, tiêu đề) tại giao điểm lưới một phần ba hoặc đường tỷ lệ vàng.
+- Dùng 2–3 cỡ chữ cạnh nhau trên cùng một thang, ví dụ thang vàng 16 / 25.9 / 41.9.
+- Giữ mọi chữ trong lề an toàn 8%.
+- Để trống khoảng 10% phía dưới cho gợi ý "Cuộn xuống".
+
 ### Thời gian
 Ô chọn ngày giờ của trình duyệt. Giờ tính theo máy người xem, không có múi giờ.
 
@@ -80,7 +113,9 @@ Mỗi điểm đến là một thẻ:
 - **Tải ảnh từ máy:** bấm nút hoặc **kéo thả ảnh vào khung mục Ảnh nền** (khung có viền nét đứt khi kéo vào). Xem chi tiết bên dưới.
 - **Độ phủ màu nền (0–95%):** càng cao chữ càng dễ đọc, ảnh càng chìm. Nên để 60–80% cho ảnh nhiều chi tiết.
 - **Làm mờ (0–100%):** 0% là nét. 20–50% cho cảm giác mềm, sang.
-- Hai thanh trượt bị khoá khi chọn "Không".
+- **Điểm lấy nét:** kéo chấm trên ảnh nhỏ tới phần ảnh muốn giữ khi màn hình cắt bớt ảnh (ví dụ ngọn nến).
+- **Phóng to (100–300%):** phóng ảnh quanh điểm lấy nét.
+- Các thanh trượt và điểm lấy nét bị khoá khi chọn "Không".
 
 ## Kết nối GitHub (lần đầu)
 

@@ -44,7 +44,9 @@ git push                     # GitHub Pages tự deploy, khoảng 1 phút
 custom-invitation/
 ├── index.html         Trang thiệp (HTML + CSS + JS inline)
 ├── admin/index.html   Trang cấu hình
-├── shared.js          Dùng chung: mặc định, theme, font, ảnh nền, URL helper, đọc config, áp style
+├── shared.js          Dùng chung: mặc định, theme, font, ảnh nền, URL helper, đọc config, áp style, mô hình bố cục tự do
+├── board.css          Style trang thiết kế tự do, dùng chung cho trang thiệp và trình chỉnh sửa (WYSIWYG)
+├── admin/editor.js    Trình thiết kế kéo thả (chế độ "Tự thiết kế")
 ├── config.json        Cấu hình đã lưu (do admin ghi qua GitHub API, KHÔNG sửa tay khi admin đang mở)
 ├── uploads/           Ảnh nền tải từ máy (do admin ghi)
 ├── check.mjs          Kiểm thử end-to-end (Playwright + Chrome)

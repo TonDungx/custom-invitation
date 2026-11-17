@@ -56,6 +56,42 @@ Ba biểu tượng chỉ hiện khi có dữ liệu. Không có cái nào thì k
 | `bgDim` | number 0–95 | `70` | % lớp màu nền theme phủ lên ảnh. Bị giới hạn trong khoảng 0–95. |
 | `bgBlur` | number 0–100 | `0` | % độ mờ. 100% = 24px. 0 = không mờ. |
 
+| `bgX`, `bgY` | number 0–100 | `50`, `50` | Điểm lấy nét của ảnh nền (%), dùng làm `background-position` và tâm phóng to |
+| `bgZoom` | number 100–300 | `100` | % phóng to ảnh nền quanh điểm lấy nét |
+
+### Bố cục tự do (`layout`)
+`null` (mặc định) = bố cục mẫu. Khi người dùng chọn "Tự thiết kế":
+
+```jsonc
+"layout": {
+  "mode": "free",                   // "template": vẫn giữ thiết kế nhưng hiển thị bố cục mẫu
+  "portrait":  { "items": [ … ] },  // bản dọc, màn hình chuẩn 390×844
+  "landscape": { "items": [ … ] }   // bản ngang, chuẩn 1440×900; null = màn ngang hiện bản dọc ở giữa
+}
+```
+
+Mỗi phần tử trong `items` (thứ tự trong mảng = thứ tự lớp, phần tử sau nằm trên):
+
+| Trường | Kiểu | Ý nghĩa |
+|---|---|---|
+| `id` | string | Định danh duy nhất |
+| `type` | `"field"` hoặc `"text"` | `field` lấy nội dung từ form, `text` là chữ tự do |
+| `field` | `greeting`, `to`, `title`, `message`, `sign`, `date`, `when` | Khi `type = "field"`: Lời chào ("Gửi {to},"), Tên người nhận, Tiêu đề, Lời nhắn, Chữ ký ("— {from}"), Ngày ("dd · mm · yyyy"), Thứ & giờ |
+| `text` | string | Khi `type = "text"`. Có xuống dòng. |
+| `cx`, `cy` | number (%) | **Tâm** phần tử theo % chiều rộng và chiều cao màn hình (−50 đến 150) |
+| `w` | number (px thiết kế) | Bề ngang. Chiều cao tự theo nội dung. |
+| `fs` | number (px thiết kế) | Cỡ chữ |
+| `rot` | number (độ) | Góc xoay quanh tâm |
+| `font` | `"display"` hoặc `"body"` | Font tiêu đề (theo cấu hình `font`) hoặc Be Vietnam Pro |
+| `color` | `"fg"`, `"muted"`, `"accent"` | Màu theo theme (không dùng mã màu cố định, để đổi theme vẫn hợp) |
+| `align` | `"left"`, `"center"`, `"right"` | Căn lề |
+| `italic`, `caps` | boolean | Nghiêng, in hoa |
+| `ls` | number (em) | Giãn chữ, 0–0.5 |
+| `lh` | number | Giãn dòng, 0.8–2.4 |
+| `op` | number (%) | Độ đậm, 10–100 |
+
+**Đơn vị "px thiết kế":** khi hiển thị, 1 px thiết kế = `min(rộng màn hình / 390, cao màn hình / 844)` (bản ngang: 1440 và 900). Mọi giá trị được giới hạn và lọc theo danh sách cho phép trong `itemStyle()` trước khi đưa vào CSS.
+
 **Ảnh preset** (Unsplash License, miễn phí):
 
 | Key | Nhãn | Unsplash photo id | Gợi ý theme |
