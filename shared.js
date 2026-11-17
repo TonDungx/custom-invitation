@@ -1,5 +1,5 @@
 // Shared by index.html and admin/: defaults, themes, backgrounds, URL helpers, config loading.
-// Saved config = config.json in the GitHub repo (written by admin via the contents API).
+// Saved invites live in Firestore (invites/{id}, encrypted; firebase-config.js + firestore.rules), read here over REST.
 // URL hash (compressed JSON) is only used for the admin live preview. See docs/architecture.md.
 
 const DEFAULT = {
@@ -20,7 +20,8 @@ const DEFAULT = {
   reply: '',
   replyLabel: 'Nhắn cho anh',
   theme: 'ivory',
-  font: 'cormorant',
+  style: 'minimal', // key of STYLES: layout, ornaments, effects (colours stay in THEMES)
+  font: 'auto',     // key of FONTS, or 'auto' = the style's own font
   intro: true,
   bg: '',      // '' | preset key | custom https URL
   bgDim: 70,   // % of theme colour laid over the photo (keeps text readable)
@@ -44,13 +45,15 @@ const BACKGROUNDS = {
   still:   { label: 'Tĩnh vật', id: '1755401679272-c2e026885af4' },
 };
 const unsplash = (id, w) => `https://images.unsplash.com/photo-${id}?w=${w}&q=70&auto=format&fit=crop`;
-// '' | preset key | https URL | "enc:https://…" (encrypted upload, resolve with imageSrc()).
+// '' | preset key | https URL | "fs:<photoId>" (encrypted photo in Firestore) | "enc:https://…" (old GitHub upload).
+// Resolve photos with imageSrc().
 function bgUrl(bg, w) {
   if (!bg) return '';
   if (BACKGROUNDS[bg]) return unsplash(BACKGROUNDS[bg].id, w);
   return httpsSrc(bg);
 }
 function httpsSrc(s) {
+  if (/^fs:[\w-]{1,40}$/.test(s)) return s;
   const enc = String(s || '').startsWith('enc:'), u = safeUrl(enc ? s.slice(4) : s);
   return /^https:/.test(u) ? (enc ? 'enc:' : '') + u : '';
 }
@@ -63,12 +66,35 @@ const THEMES = {
   blush: { label: 'Blush', bg: '#F6EEEC', fg: '#2A1D1D', muted: '#7A6460', line: '#E6D6D2', accent: '#9C5B5B' },
 };
 
-// All families support Vietnamese glyphs.
+// Title fonts. All have a Vietnamese subset (Google Fonts css2 serves a "/* vietnamese */" block).
 const FONTS = {
-  cormorant: { label: 'Cormorant', display: '"Cormorant Garamond", serif', q: 'Cormorant+Garamond:ital,wght@0,400;0,500;1,400' },
-  playfair:  { label: 'Playfair',  display: '"Playfair Display", serif',   q: 'Playfair+Display:ital,wght@0,400;0,500;1,400' },
-  lora:      { label: 'Lora',      display: '"Lora", serif',               q: 'Lora:ital,wght@0,400;0,500;1,400' },
+  cormorant:   { label: 'Cormorant',    display: '"Cormorant Garamond", serif',      q: 'Cormorant+Garamond:ital,wght@0,400;0,500;1,400' },
+  playfair:    { label: 'Playfair',     display: '"Playfair Display", serif',        q: 'Playfair+Display:ital,wght@0,400;0,500;1,400' },
+  lora:        { label: 'Lora',         display: '"Lora", serif',                    q: 'Lora:ital,wght@0,400;0,500;1,400' },
+  oldstandard: { label: 'Old Standard', display: '"Old Standard TT", serif',         q: 'Old+Standard+TT:ital,wght@0,400;0,700;1,400' },
+  bricolage:   { label: 'Bricolage',    display: '"Bricolage Grotesque", sans-serif', q: 'Bricolage+Grotesque:wght@400;500;700;800' },
+  baloo:       { label: 'Baloo',        display: '"Baloo 2", sans-serif',            q: 'Baloo+2:wght@400;500;700;800' },
+  mali:        { label: 'Mali',         display: '"Mali", sans-serif',               q: 'Mali:ital,wght@0,400;0,500;0,600;1,400' },
 };
+// Style = layout + ornaments + motion. CSS in styles.css ([data-style=…]), ornaments/effects in styles.js.
+// font: default title font; body/script: [CSS family, Google Fonts query] (default Be Vietnam Pro / title italic).
+const BODY_FONT = ['"Be Vietnam Pro", system-ui, sans-serif', 'Be+Vietnam+Pro:wght@300;400;500'];
+const NUNITO = ['"Nunito", system-ui, sans-serif', 'Nunito:wght@400;600;700'];
+const STYLES = {
+  minimal:   { label: 'Tối giản', hint: 'Sang trọng, nhiều khoảng trắng', font: 'cormorant' },
+  vintage:   { label: 'Cổ điển',  hint: 'Khung viền, hoa văn, dấu sáp',  font: 'oldstandard', script: ['"Dancing Script", cursive', 'Dancing+Script:wght@400;600'] },
+  editorial: { label: 'Tạp chí',  hint: 'Chữ lớn, lưới lệch, đánh số',   font: 'bricolage' },
+  romance:   { label: 'Lãng mạn', hint: 'Cành hoa, chữ viết tay',       font: 'cormorant',   script: ['"Great Vibes", cursive', 'Great+Vibes'] },
+  playful:   { label: 'Vui tươi', hint: 'Khối màu, sticker, confetti',  font: 'baloo', body: NUNITO },
+  cute:      { label: 'Đáng yêu', hint: 'Bo tròn, chấm bi, trái tim',   font: 'mali',  body: NUNITO },
+};
+const styleKey = cfg => STYLES[cfg.style] ? cfg.style : 'minimal';
+// Fonts for a config: { display, body, script, scriptItalic, qs }. 'auto' or unknown font -> the style's.
+function styleFonts(cfg) {
+  const s = STYLES[styleKey(cfg)], f = FONTS[cfg.font] || FONTS[s.font], body = s.body || BODY_FONT;
+  return { display: f.display, body: body[0], script: s.script?.[0] || f.display, scriptItalic: !s.script,
+    qs: [f.q, body[1], s.script?.[1], BODY_FONT[1]].filter((q, i, a) => q && a.indexOf(q) === i) };
+}
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -97,18 +123,36 @@ async function unpack(str) {
   const s = new Blob([b64u.dec(str)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
   return JSON.parse(await new Response(s).text());
 }
-// "owner/repo" when served from <owner>.github.io/<repo>/, else ''.
+// "owner/repo" when served from <owner>.github.io/<repo>/, else ''. Only for importing pre-account invites.
 function repoFromLocation() {
   const m = location.hostname.match(/^([^.]+)\.github\.io$/);
   return m && location.pathname.split('/')[1] ? `${m[1]}/${location.pathname.split('/')[1]}` : '';
 }
 
-// ---- Encryption: config.json and uploaded photos are AES-GCM encrypted in the (public) repo. ----
+// ---- Firestore over REST (no SDK on the invite page). Values: only the types we store. ----
+const fsBase = () => (FIREBASE.emulator ? `http://${FIREBASE.emulator}:8080` : 'https://firestore.googleapis.com') +
+  `/v1/projects/${FIREBASE.projectId}/databases/(default)/documents`;
+// GET of a missing doc -> null. Other failures throw Error(status).
+async function fsReq(method, path, { token, body, qs = '' } = {}) {
+  const r = await fetch(`${fsBase()}${path}${qs}`, { method, cache: 'no-store', body: body && JSON.stringify(body),
+    headers: { 'content-type': 'application/json', ...(token && { Authorization: 'Bearer ' + token }) } });
+  if (r.status === 404 && method === 'GET') return null;
+  if (!r.ok) throw Object.assign(new Error(r.status), { status: r.status });
+  return r.json();
+}
+const fromFs = v => 'stringValue' in v ? v.stringValue : 'integerValue' in v ? +v.integerValue
+  : 'bytesValue' in v ? Uint8Array.from(atob(v.bytesValue), c => c.charCodeAt(0)) : 'timestampValue' in v ? v.timestampValue
+  : 'mapValue' in v ? fsData(v.mapValue) : null;
+const fsData = d => d && Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, fromFs(v)]));
+const fsId = d => d.name.split('/').pop();
+
+// ---- Encryption: invites and photos are AES-GCM encrypted in the browser before they are stored. ----
 // The 256-bit key travels only in the link fragment (#k=…), which browsers never send to a server.
-// The owner's browser also keeps it in localStorage (same origin as the invite).
-const KEY_LS = 'invite-key';
+// The owner keeps it in users/{uid} (Firestore, owner-only) and this browser's localStorage (per invite).
+let INVITE_ID = new URLSearchParams(location.search).get('i') || '';
+const KEY_LS = 'invite-key'; // + ':' + invite id. Bare KEY_LS = key of the old GitHub-stored invite.
 const hashKey = () => location.hash.match(/(?:^#|&)k=([\w-]{43})(?:&|$)/)?.[1] || '';
-const storedKey = () => { try { return localStorage.getItem(KEY_LS) || ''; } catch { return ''; } };
+const storedKey = (id = INVITE_ID) => { try { return localStorage.getItem(id ? KEY_LS + ':' + id : KEY_LS) || ''; } catch { return ''; } };
 const currentKey = () => hashKey() || storedKey();
 const newKey = () => b64u.enc(crypto.getRandomValues(new Uint8Array(32)));
 const aesKey = k => crypto.subtle.importKey('raw', b64u.dec(k), 'AES-GCM', false, ['encrypt', 'decrypt']);
@@ -129,33 +173,51 @@ async function openConfig(j, k = currentKey()) {
   if (!k) throw locked();
   try { return JSON.parse(new TextDecoder().decode(await unseal(k, b64u.dec(j.enc)))); } catch { throw locked(); }
 }
-// Encrypted photo references: "enc:https://raw.githubusercontent.com/…/uploads/x.bin" -> blob: URL (cached).
+// Photo references -> blob: URL (cached). "fs:<id>" = invites/{INVITE_ID}/photos/{id}; "enc:https://…" = old GitHub upload.
 const encCache = new Map();
 function imageSrc(src) {
-  if (!src?.startsWith('enc:')) return Promise.resolve(src || '');
+  if (!/^(fs|enc):/.test(src || '')) return Promise.resolve(src || '');
   if (!encCache.has(src)) encCache.set(src, (async () => {
-    const r = await fetch(src.slice(4));
-    if (!r.ok) throw new Error(r.status);
-    return URL.createObjectURL(new Blob([await unseal(currentKey(), await r.arrayBuffer())]));
+    const bytes = src.startsWith('fs:') ? fsData(await fsReq('GET', `/invites/${INVITE_ID}/photos/${src.slice(3)}`))?.data
+      : new Uint8Array(await (await fetch(src.slice(4))).arrayBuffer());
+    if (!bytes) throw new Error('404');
+    return URL.createObjectURL(new Blob([await unseal(currentKey(), bytes)]));
   })().catch(() => ''));
   return encCache.get(src);
 }
 const hydrateImages = root => root.querySelectorAll('img[data-src]').forEach(async im => { im.src = await imageSrc(im.dataset.src); });
 
-// Config source: #hash (admin preview, packed JSON) > config.json via GitHub API (fresh ~60s)
-// > config.json on Pages (CDN may be up to 10 min stale) > defaults. Encrypted without key -> { locked: true }.
-async function readConfig(localUrl) {
+// Links shared before accounts (…/#k=KEY): sha256(KEY) -> invite id, stored by the import (aliases/{hash}).
+const sha256hex = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+const aliasOf = async k => fsData(await fsReq('GET', '/aliases/' + await sha256hex(k)).catch(() => null))?.invite || '';
+
+// The invite saved before accounts: config.json in the repo (GitHub API first: Pages' CDN may be 10 min stale).
+// Read only until it is imported into an account and removed from the repo. root = path to the site root.
+async function legacyJson(root = './') {
+  const repo = repoFromLocation();
+  for (const url of [repo && `https://api.github.com/repos/${repo}/contents/config.json`, root + 'config.json']) {
+    if (!url) continue;
+    try { const r = await fetch(url, { headers: { Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' }); if (r.ok) return await r.json(); } catch {}
+  }
+  return null;
+}
+
+// Config source: #hash (admin preview, packed JSON) > invites/{?i=} in Firestore > old link (#k= only: alias, else
+// the old config.json) > defaults (demo, no ?i=). Flags: { locked } wrong/missing key, { missing } no such invite
+// (or offline), { demo } no invite id.
+async function readConfig() {
   const D = structuredClone(DEFAULT), h = location.hash.slice(1);
   if (h && !/^k=/.test(h)) try { return { ...D, ...(await unpack(h)), preview: true }; } catch {}
-  const repo = repoFromLocation();
-  for (const url of [repo && `https://api.github.com/repos/${repo}/contents/config.json`, localUrl]) {
-    if (!url) continue;
-    try {
-      const r = await fetch(url, { headers: { Accept: 'application/vnd.github.raw+json' } });
-      if (r.ok) return { ...D, ...(await openConfig(await r.json())) };
-    } catch (e) { if (e.locked) return { ...D, locked: true }; }
+  if (!INVITE_ID && hashKey() && FIREBASE.projectId) INVITE_ID = await aliasOf(hashKey());
+  if (!INVITE_ID && hashKey()) { // sent before accounts and not imported yet: keep it working
+    const j = await legacyJson();
+    if (!j) return { ...D, missing: true };
+    try { return { ...D, ...(await openConfig(j)) }; } catch { return { ...D, locked: true }; }
   }
-  return D;
+  if (!INVITE_ID || !FIREBASE.projectId) return { ...D, demo: true };
+  const doc = fsData(await fsReq('GET', '/invites/' + INVITE_ID).catch(() => null));
+  if (!doc) return { ...D, missing: true };
+  try { return { ...D, ...(await openConfig(doc)) }; } catch { return { ...D, locked: true }; }
 }
 
 // ---- Email notifications via the owner's Google Apps Script web app (docs/notifications.md) ----
@@ -236,23 +298,28 @@ function boardItemsHTML(cfg, items, { fmt = esc, reveal = false } = {}) {
 }
 const freeLayout = cfg => cfg.layout?.mode === 'free' && cfg.layout.portrait?.items?.length ? cfg.layout : null;
 
-// Sets theme tokens + loads the display font. Resolves once the font is usable.
+// Sets theme tokens, style and fonts. Resolves once the fonts are usable.
 function applyStyle(cfg) {
-  const t = THEMES[cfg.theme] || THEMES.ivory, f = FONTS[cfg.font] || FONTS.cormorant, r = document.documentElement.style;
+  const t = THEMES[cfg.theme] || THEMES.ivory, f = styleFonts(cfg), r = document.documentElement.style;
   for (const k of ['bg', 'fg', 'muted', 'line', 'accent']) r.setProperty('--' + k, t[k]);
   r.setProperty('--display', f.display);
+  r.setProperty('--body', f.body);
+  r.setProperty('--script', f.script);
+  r.setProperty('--script-style', f.scriptItalic ? 'italic' : 'normal');
+  document.documentElement.dataset.style = styleKey(cfg);
   r.colorScheme = cfg.theme === 'noir' ? 'dark' : 'light';
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.bg);
   return Promise.all([loadFont(f), applyBackground(cfg, r)]);
 }
 
+// f = styleFonts(cfg). Waits for the title/script glyphs with stacked Vietnamese diacritics.
 function loadFont(f) {
-  const href = `https://fonts.googleapis.com/css2?family=${f.q}&family=Be+Vietnam+Pro:wght@300;400;500&display=swap`;
+  const href = `https://fonts.googleapis.com/css2?${f.qs.map(q => 'family=' + q).join('&')}&display=swap`;
   let link = document.getElementById('font');
   if (link?.href === href) return Promise.resolve();
   link ??= Object.assign(document.head.appendChild(document.createElement('link')), { id: 'font', rel: 'stylesheet' });
   return new Promise(ok => { link.onload = link.onerror = ok; link.href = href; })
-    .then(() => document.fonts.load(`400 1em ${f.display}`, 'Ểm'));
+    .then(() => Promise.all([f.display, f.script, f.body].map(x => document.fonts.load(`400 1em ${x}`, 'Ểm'))));
 }
 
 // Sets --bg-img / --dim / --blur. Blurred photos are fetched smaller (detail is blurred away anyway).

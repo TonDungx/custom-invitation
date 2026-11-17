@@ -1,6 +1,8 @@
-# Cấu hình (`config.json`)
+# Cấu hình thiệp
 
-> **Định dạng lưu:** `config.json` trong repo là `{ "v": 1, "enc": "<base64url(iv 12 byte ‖ AES-GCM ciphertext)>" }`. Nội dung bên dưới là JSON **sau khi giải mã**. Khoá 256-bit nằm trong link (`#k=<43 ký tự base64url>`) và trong `localStorage['invite-key']` của trình duyệt admin. File JSON chưa mã hoá (dữ liệu cũ) vẫn đọc được; lần lưu đầu sẽ chuyển sang mã hoá.
+> **Định dạng lưu:** mỗi thiệp là document Firestore `invites/{id}` = `{ owner: <uid>, v: 1, enc: "<base64url(iv 12 byte ‖ AES-GCM ciphertext)>", updated }`. Nội dung bên dưới là JSON **sau khi giải mã**. Khoá 256-bit (43 ký tự base64url) nằm trong link (`?i=<id>#k=<khoá>`), trong `users/{uid}.keys.<id>` (chỉ chủ đọc được) và `localStorage['invite-key:<id>']`. Ảnh: `invites/{id}/photos/{pid}` = `{ owner, data: bytes(iv ‖ ciphertext) }`, tham chiếu trong config là `"fs:<pid>"`. Xem [firebase-setup.md](firebase-setup.md).
+>
+> Trước khi có tài khoản, thiệp nằm ở `config.json` + `uploads/` trong repo (cùng cách mã hoá). Trang thiệp vẫn đọc file đó cho link cũ `…/#k=` cho tới khi thiệp được nhập vào tài khoản.
 
 Nguồn định nghĩa duy nhất là object `DEFAULT` trong [`shared.js`](../shared.js). File `config.json` chỉ cần chứa các trường khác mặc định. Khi đọc, cấu hình luôn được merge `{ ...DEFAULT, ...config }`, nên trường thiếu sẽ lấy giá trị mặc định.
 
@@ -50,7 +52,8 @@ Ba biểu tượng chỉ hiện khi có dữ liệu. Không có cái nào thì k
 | Trường | Kiểu | Mặc định | Giá trị |
 |---|---|---|---|
 | `theme` | string | `"ivory"` | `ivory`, `noir`, `sage`, `blush` (xem [design-system.md](design-system.md)). Sai giá trị thì dùng `ivory`. |
-| `font` | string | `"cormorant"` | `cormorant`, `playfair`, `lora`. Sai giá trị thì dùng `cormorant`. |
+| `style` | string | `"minimal"` | `minimal`, `vintage`, `editorial`, `romance`, `playful`, `cute` (xem [design-system.md](design-system.md#kiểu-thiệp-styles)). Thiếu hoặc sai → `minimal` (config cũ giữ nguyên giao diện). |
+| `font` | string | `"auto"` | `auto` (= font của kiểu thiệp), `cormorant`, `playfair`, `lora`, `oldstandard`, `bricolage`, `baloo`, `mali`. Sai giá trị thì dùng font của kiểu thiệp. Admin đặt lại `auto` khi đổi kiểu thiệp. |
 | `intro` | boolean | `true` | Hiện phong thư "Mở thư" trước khi vào trang |
 
 ### Ảnh nền
@@ -91,7 +94,7 @@ Mỗi phần tử trong `items` (thứ tự trong mảng = thứ tự lớp, ph�
 | `w` | number (px thiết kế) | Bề ngang. Chiều cao tự theo nội dung. |
 | `fs` | number (px thiết kế) | Cỡ chữ |
 | `rot` | number (độ) | Góc xoay quanh tâm |
-| `font` | `"display"` hoặc `"body"` | Font tiêu đề (theo cấu hình `font`) hoặc Be Vietnam Pro |
+| `font` | `"display"` hoặc `"body"` | Font tiêu đề (theo cấu hình `font` / kiểu thiệp) hoặc font thân bài của kiểu thiệp |
 | `color` | `"fg"`, `"muted"`, `"accent"` | Màu theo theme (không dùng mã màu cố định, để đổi theme vẫn hợp) |
 | `align` | `"left"`, `"center"`, `"right"` | Căn lề |
 | `italic`, `caps` | boolean | Nghiêng, in hoa |

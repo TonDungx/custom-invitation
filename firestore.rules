@@ -1,0 +1,50 @@
+rules_version = '2';
+// Security rules for the invitation data (paste into Firebase console → Firestore → Rules, or `firebase deploy --only firestore:rules`).
+// Content is AES-GCM encrypted in the browser; the key travels only in the share link (#k=…) and in the
+// owner's users/{uid} doc. So "anyone with the id can read an invite" exposes ciphertext only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(data) { return signedIn() && data.owner == request.auth.uid; }
+    function inviteOf(id) { return get(/databases/$(database)/documents/invites/$(id)).data; }
+
+    match /invites/{id} {
+      allow get: if true;                        // the recipient opens the link without signing in
+      allow list: if isOwner(resource.data);     // "my invites" query must filter owner == uid
+      allow create: if isOwner(request.resource.data) && validInvite();
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && validInvite();
+      allow delete: if isOwner(resource.data);
+
+      function validInvite() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['owner', 'enc', 'v', 'updated'])
+          && d.enc is string && d.enc.size() < 400000
+          && d.v == 1 && d.updated is timestamp;
+      }
+
+      // Photos: encrypted bytes (iv ‖ ciphertext), < 1 MB (Firestore documents are capped at 1 MiB).
+      match /photos/{pid} {
+        allow get: if true;
+        allow list: if isOwner(resource.data);
+        allow create: if isOwner(request.resource.data) && isOwner(inviteOf(id))
+          && request.resource.data.keys().hasOnly(['owner', 'data'])
+          && request.resource.data.data is bytes && request.resource.data.data.size() < 1000000;
+        allow delete: if isOwner(resource.data);
+      }
+    }
+
+    // Old share links (…/#k=KEY, before accounts): sha256(KEY) -> invite id. Reveals nothing about the content.
+    match /aliases/{hash} {
+      allow get: if true;
+      allow list: if isOwner(resource.data); // deleting an invite removes its aliases
+      allow create: if isOwner(request.resource.data) && isOwner(inviteOf(request.resource.data.invite))
+        && request.resource.data.keys().hasOnly(['owner', 'invite']);
+      allow delete: if isOwner(resource.data);
+    }
+
+    // Per-user invite keys, so the owner can open their invites on any signed-in device.
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+  }
+}

@@ -7,7 +7,7 @@
 - **Lý do:** trang nhỏ, cần nhanh và mượt. Không có bundle framework, không bước build, deploy bằng cách copy file.
 - **Đánh đổi:** không có component tái sử dụng hay type-check. Nếu cần nhiều trang hoặc nhiều mẫu thiệp thì nên cân nhắc lại.
 
-### QĐ-2: Lưu cấu hình trong `config.json` của repo, ghi qua GitHub API
+### QĐ-2: Lưu cấu hình trong `config.json` của repo, ghi qua GitHub API (đã thay bằng QĐ-13)
 - **Bối cảnh:**
   - Bản đầu nén cấu hình vào hash của URL (`#…`): không cần lưu trữ, nhưng link dài khoảng 600 ký tự. Người dùng thấy không chấp nhận được.
   - Người dùng muốn có nút "Áp dụng để lưu".
@@ -20,7 +20,7 @@
   - Mỗi lần lưu là một commit.
   - Cần token, token nằm trong `localStorage`.
 
-### QĐ-3: Trang thiệp đọc config qua GitHub API trước, Pages sau
+### QĐ-3: Trang thiệp đọc config qua GitHub API trước, Pages sau (chỉ còn cho link cũ, xem QĐ-13)
 - **Bối cảnh:** đo được CDN của Pages cache 600s, và query string không bỏ qua được cache.
 - **Chọn:** `api.github.com/repos/{repo}/contents/config.json` với header raw. Lưu xong là thấy trong khoảng 1 phút.
 - **Đánh đổi:** giới hạn 60 request/giờ/IP khi không xác thực [Unverified, theo tài liệu GitHub]. Vượt thì rơi xuống bản trên Pages (có thể cũ tới 10 phút).
@@ -29,7 +29,7 @@
 - Admin gửi cấu hình đang sửa vào iframe bằng `#<deflate+base64url>`. Đổi fragment không reload trang. Trang thiệp nghe `hashchange` để vẽ lại.
 - Không dùng `postMessage` vì đường hash đã có sẵn và cũng dùng được để test.
 
-### QĐ-5: Ảnh tải lên được lưu trong repo, link gắn commit SHA
+### QĐ-5: Ảnh tải lên được lưu trong repo, link gắn commit SHA (đã thay bằng QĐ-13)
 - **Chọn:** nén trên máy (≤ 2400px, WebP 0.82), `PUT uploads/<ts>.webp`, link `raw.githubusercontent.com/<repo>/<sha>/<path>`.
 - **Lý do:** dùng ngay, không chờ Pages build. Nội dung không bao giờ đổi nên cache không gây vấn đề. Đã đo: raw trả `image/webp` và có CORS.
 - **Đánh đổi:** ảnh cũ không tự xoá. Ảnh công khai.
@@ -71,13 +71,25 @@ Khung che cả khối chữ làm dòng thứ 2 bị cắt giữa chừng, trông
 - **Chọn:** Web App Apps Script (`doPost` → `MailApp`), chạy dưới tài khoản người dùng. Trang thiệp `POST` kiểu `no-cors`. URL nằm trong config đã mã hoá. Script giới hạn 30 mail/giờ và escape dữ liệu.
 - **Đánh đổi:** người dùng phải tự deploy (khoảng 5 phút). Trang không biết mail đã gửi được chưa (phản hồi opaque).
 
+### QĐ-13: Tài khoản Google + Firestore; nội dung ra khỏi repo
+- **Bối cảnh:** người dùng không muốn nội dung cá nhân nằm trong repo (kể cả đã mã hoá) và muốn có tài khoản, đăng nhập Google, **ai cũng đăng ký được**. Phân tích BMAD: `_bmad-output/planning-artifacts/accounts-google-login-analysis.md` (chỉ có trên máy).
+- **Chọn:** Firebase Auth (Google) + Firestore, hosting vẫn GitHub Pages.
+  - Chỉ nạp **Auth SDK 12.6.0** (gstatic) ở admin; Firestore đi qua **REST** (`fetch`), trang thiệp không nạp SDK nào.
+  - Giữ mã hoá phía trình duyệt (QĐ-11): Firestore chỉ chứa bản mã; khoá trong link + `users/{uid}` (chỉ chủ đọc).
+  - Ảnh là bytes trong Firestore (< 1 MB/ảnh, tự nén nhỏ dần), không dùng Cloud Storage.
+  - Lưu bằng `:commit` có precondition `updateTime` (emulator bỏ qua precondition dạng query `?currentDocument.updateTime=`).
+  - Link cũ `…/#k=KEY`: trước khi nhập vẫn đọc `config.json` cũ; khi nhập thì giữ nguyên khoá và ghi `aliases/{sha256(KEY)} → id`.
+- **Phương án bị loại:** Supabase (dự án miễn phí tự tạm dừng sau 1 tuần không hoạt động, theo trang pricing của Supabase: thiệp gửi đi có thể chết); repo private (Pages miễn phí cần repo public).
+- **Đánh đổi:** thêm một dịch vụ bên ngoài, chủ site phải tự tạo project (~10 phút); hạn mức miễn phí dùng chung cho mọi người đăng ký; chưa có giới hạn số thiệp/ảnh mỗi tài khoản (cần App Check hoặc hạn mức trong Rules nếu bị lạm dụng).
+
 ## Giới hạn đã biết
 
 | Giới hạn | Ảnh hưởng | Cách khắc phục (nếu cần) |
 |---|---|---|
 | Lịch sử git còn bản rõ trước khi mã hoá | `config.json` cũ và 3 ảnh `.webp` cũ vẫn xem được qua lịch sử commit | Viết lại lịch sử (`git filter-repo`) và force-push. Thao tác phá huỷ, cần đồng ý riêng. |
 | Mất khoá | Không đọc lại được config | Nhập lại nội dung, lưu với khoá mới |
-| Admin không có mật khẩu | Ai vào `/admin` cũng xem được giao diện, nhưng **không lưu được** nếu không có token | Đủ an toàn cho mục đích hiện tại |
+| Ai cũng đăng ký được | Hạn mức miễn phí Firestore dùng chung; một người có thể tạo nhiều thiệp/ảnh | App Check, hạn mức trong Rules |
+| Popup đăng nhập Google trong app Messenger/Zalo | Có thể bị chặn | Chỉ admin cần đăng nhập; mở admin bằng trình duyệt thường |
 | Thông báo cần người dùng tự deploy Apps Script | Chưa deploy thì không có mail | Làm theo [notifications.md](notifications.md) |
 | Một thiệp tại một thời điểm | Mỗi repo chỉ có một `config.json` | Thêm tham số `?id=` và `configs/<id>.json` |
 | Ngày giờ không có múi giờ | Người xem ở múi giờ khác thấy đếm ngược lệch | Lưu kèm offset |

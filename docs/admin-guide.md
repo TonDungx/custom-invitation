@@ -30,8 +30,10 @@ Mở `https://tondungx.github.io/custom-invitation/admin`. Gõ `/admin` hay `/ad
 |---|---|
 | Chấm và chữ trạng thái | **Đã lưu** (chấm xanh): form khớp bản đã lưu. **Chưa lưu** (chấm vàng): có thay đổi. **Đang lưu…**. **Lỗi khi lưu** (đỏ). |
 | Mở trang | Mở link thiệp **đã lưu** trong tab mới (không phải bản đang sửa). |
-| Sao chép link | Chép link thiệp **kèm mã khoá** `…/custom-invitation/#k=…`. Chỉ ai có đúng link này mới xem được nội dung. Nếu còn thay đổi chưa lưu, thông báo sẽ nhắc bấm Áp dụng. |
-| Áp dụng | Lưu vào `config.json` trong repo. Chỉ bấm được khi có thay đổi. Phím tắt: **Ctrl+S** (Mac: **Cmd+S**). |
+| Ô chọn thiệp | Các thiệp của tài khoản (tên người nhận · tiêu đề). Đổi thiệp khi còn thay đổi chưa lưu thì hỏi xác nhận. |
+| Sao chép link | Chép link thiệp **kèm mã khoá** `…/custom-invitation/?i=<mã thiệp>#k=<khoá>`. Chỉ ai có đúng link này mới xem được nội dung; người nhận **không cần đăng nhập**. Nếu còn thay đổi chưa lưu, thông báo sẽ nhắc bấm Áp dụng. |
+| Áp dụng | Lưu thiệp (đã mã hoá) vào Firestore. Chỉ bấm được khi có thay đổi. Phím tắt: **Ctrl+S** (Mac: **Cmd+S**). |
+| Nút tròn (chữ cái đầu) | Menu tài khoản: email, **Thiệp mới**, **Nhập thiệp cũ (từ GitHub)** (chỉ hiện khi repo còn `config.json` cũ), **Xoá thiệp này**, **Đăng xuất**. |
 
 Đóng hoặc tải lại trang khi còn thay đổi chưa lưu thì trình duyệt sẽ hỏi xác nhận.
 
@@ -47,7 +49,7 @@ Mở `https://tondungx.github.io/custom-invitation/admin`. Gõ `/admin` hay `/ad
 ### Trang thiết kế (`/admin/design`, tab riêng)
 Mở bằng nút **Mở trình thiết kế ↗**, hoặc vào thẳng `https://tondungx.github.io/custom-invitation/admin/design`.
 
-- Trang thiết kế hiển thị đúng như thiệp thật (theme, font, ảnh nền, lớp phủ), lấy theo **cấu hình đã lưu**. Muốn thấy nội dung vừa sửa ở form thì bấm Áp dụng ở form trước. Quay lại tab thiết kế, nội dung tự cập nhật (cần đã kết nối GitHub).
+- Trang thiết kế hiển thị đúng như thiệp thật (theme, font, ảnh nền, lớp phủ), lấy theo **cấu hình đã lưu**. Muốn thấy nội dung vừa sửa ở form thì bấm Áp dụng ở form trước. Quay lại tab thiết kế, nội dung tự cập nhật.
 - Header có: **← Cấu hình** (về form), trạng thái, **Xem thử ↗** (mở thiệp với thiết kế chưa lưu trong tab mới), **Áp dụng** (Ctrl+S).
 - **Áp dụng ở trang thiết kế** chỉ lưu bố cục và tự bật chế độ Tự thiết kế. **Áp dụng ở form** lưu phần còn lại và giữ nguyên thiết kế. Hai trang không xoá thay đổi của nhau.
 - Lần đầu mở (chưa có thiết kế), trang tạo sẵn 5 khối giống bố cục mẫu, trạng thái "Chưa lưu".
@@ -111,7 +113,8 @@ Mỗi điểm đến là một thẻ:
 
 ### Phong cách
 - **Bảng màu:** Ivory, Noir, Sage, Blush. Mỗi ô có chấm màu chia đôi: nền và màu nhấn.
-- **Font tiêu đề:** Cormorant, Playfair, Lora. Mỗi ô hiển thị bằng chính font đó.
+- **Kiểu thiệp:** Tối giản, Cổ điển, Tạp chí, Lãng mạn, Vui tươi, Đáng yêu. Khác nhau về bố cục, font, hoạ tiết, nút và hiệu ứng; dùng được với mọi bảng màu. Đổi kiểu thì font tiêu đề tự về "Theo kiểu thiệp".
+- **Font tiêu đề:** "Theo kiểu thiệp" (mặc định) hoặc chọn riêng: Cormorant, Playfair, Lora, Old Standard, Bricolage, Baloo, Mali. Mỗi ô hiển thị bằng chính font đó.
 - **Hiện phong thư mở đầu:** bật/tắt màn "Mở thư".
 
 ### Ảnh nền
@@ -123,51 +126,35 @@ Mỗi điểm đến là một thẻ:
 - **Điểm lấy nét:** kéo chấm trên ảnh nhỏ tới phần ảnh muốn giữ khi màn hình cắt bớt ảnh (ví dụ ngọn nến).
 - **Phóng to (100–300%):** phóng ảnh quanh điểm lấy nét.
 - Các thanh trượt và điểm lấy nét bị khoá khi chọn "Không".
-- **Dọn ảnh không dùng:** liệt kê `uploads/` trên GitHub, giữ lại ảnh mà config đã lưu hoặc form đang sửa còn dùng (ảnh nền, ảnh trong trang thiết kế), hỏi xác nhận rồi xoá phần còn lại (mỗi ảnh 1 commit). Có ảnh mới ở trang Thiết kế chưa Áp dụng thì Áp dụng ở đó trước. File đã xoá vẫn còn trong lịch sử git.
+- **Dọn ảnh không dùng:** liệt kê ảnh của thiệp đang mở, giữ lại ảnh mà bản đã lưu hoặc form đang sửa còn dùng (ảnh nền, ảnh trong trang thiết kế), hỏi xác nhận rồi xoá phần còn lại. Có ảnh mới ở trang Thiết kế chưa Áp dụng thì Áp dụng ở đó trước.
+
+## Tài khoản và thiệp
+
+- **Đăng nhập:** mở `/admin` → **Đăng nhập bằng Google**. Ai có tài khoản Google cũng đăng ký được; mỗi người chỉ thấy và sửa thiệp của mình (Firestore Rules chặn ở server).
+- **Lần đầu:** tài khoản chưa có thiệp thì tự tạo một thiệp mẫu. Nếu repo còn `config.json` cũ, trang hỏi có **nhập thiệp cũ** không (xem [firebase-setup.md](firebase-setup.md#5-chuyển-thiệp-cũ-vào-tài-khoản)).
+- **Nhiều thiệp:** menu tài khoản → **Thiệp mới**; đổi thiệp bằng ô chọn ở header. Link admin có dạng `/admin/?i=<mã thiệp>`.
+- **Xoá thiệp:** menu → **Xoá thiệp này**: xoá thiệp, ảnh và link cũ trỏ tới nó. Link đã gửi không mở được nữa.
+- Chưa cấu hình Firebase (`firebase-config.js` trống) thì admin chỉ hiện hướng dẫn cài đặt.
 
 ## Mã khoá (riêng tư)
 
-- Nội dung thiệp và ảnh tải lên được **mã hoá** trước khi lưu vào repo. Ai mở repo chỉ thấy dữ liệu không đọc được.
-- Khoá tạo tự động lần đầu và lưu trong trình duyệt của bạn. Nó nằm trong link mà **Sao chép link** tạo ra (đoạn `#k=…`).
-- **Mở admin ở máy hoặc trình duyệt khác:** admin hỏi **"Mở khoá thiệp"**. Dán link thiệp đầy đủ đã gửi (hoặc phần mã sau `k=`).
-- **Mất cả khoá lẫn link:** không đọc lại được nội dung cũ. Nhập lại nội dung rồi Áp dụng, thiệp sẽ dùng khoá mới. Link cũ đã gửi sẽ không mở được nữa.
-- **Chưa mở khoá** thì nút Áp dụng bị khoá, để không ghi đè nội dung thật bằng nội dung mặc định.
-
-## Kết nối GitHub (lần đầu)
-
-Nút Áp dụng và Tải ảnh ghi vào repo, nên cần một **fine-grained personal access token**:
-
-1. Mở https://github.com/settings/personal-access-tokens/new
-2. **Token name:** tuỳ ý, ví dụ `custom-invitation admin`.
-3. **Expiration:** tuỳ chọn. Hết hạn thì tạo lại.
-4. **Repository access:** *Only select repositories*, chọn `custom-invitation`.
-5. **Permissions → Repository permissions → Contents:** *Read and write*. Không cần quyền nào khác.
-6. Bấm **Generate token** và copy.
-7. Trong admin, bấm **Áp dụng** (hoặc **Kết nối GitHub** ở thanh trái), dán vào ô **Token**. Ô **Repo** đã tự điền `tondungx/custom-invitation`.
-
-Token lưu trong `localStorage` của trình duyệt đang dùng (key `invite-gh`). Đổi máy hoặc trình duyệt thì nhập lại. Muốn thu hồi: vào https://github.com/settings/personal-access-tokens, chọn token, **Revoke**.
-
-> **Bảo mật:** token chỉ có quyền ghi nội dung **một repo này**. Mọi trang trên `tondungx.github.io` dùng chung một origin, nên các repo Pages khác của cùng tài khoản đọc được `localStorage` này. Đừng host code không tin cậy dưới cùng tài khoản.
+- Nội dung thiệp và ảnh được **mã hoá trên trình duyệt** trước khi lưu. Firestore (và Google) chỉ giữ dữ liệu không đọc được.
+- Mỗi thiệp có một khoá riêng, tạo tự động. Khoá nằm trong link mà **Sao chép link** tạo ra (đoạn `#k=…`) và trong tài khoản của bạn (`users/{uid}`, chỉ bạn đọc được), nên đăng nhập ở máy nào cũng mở được.
+- **Chưa mở khoá** (tài khoản không có khoá của thiệp) thì nút Áp dụng bị khoá, để không ghi đè nội dung thật.
 
 ## Lưu (Áp dụng)
 
 1. Bấm **Áp dụng** hoặc **Ctrl+S**.
-2. Admin gửi `PUT config.json` lên GitHub, tạo commit `chore: update invitation`.
-3. Thông báo "Đã lưu. Link thiệp hiển thị nội dung mới sau khoảng 1 phút."
-4. Trang thiệp đọc config qua GitHub API, nên thường thấy nội dung mới sau khoảng 1 phút. Nếu API bị giới hạn, trang dùng bản trên Pages, có thể chậm tới khoảng 10 phút.
-
-Nếu ai đó (hoặc tab khác) vừa lưu trước, admin tự lấy phiên bản mới nhất và ghi đè. **Bản lưu sau thắng.**
+2. Admin đọc bản mới nhất, gộp phần của trang này, mã hoá, rồi ghi có điều kiện "chưa ai ghi xen giữa" (Firestore `:commit` + `updateTime`). Có người ghi xen thì đọc lại và gộp lại (tối đa 3 lần).
+3. Thông báo "Đã lưu (đã mã hoá)." Trang thiệp thấy nội dung mới **ngay** (không còn cache CDN như bản lưu trong repo).
 
 ## Tải ảnh từ máy
 
 1. Bấm **Tải ảnh từ máy** hoặc kéo thả ảnh vào mục Ảnh nền.
-2. Kiểm tra: phải là ảnh, ≤ 25MB. Chưa có token thì hỏi token.
-3. Nén ngay trên máy: cạnh dài tối đa 2400px, WebP chất lượng 82% (JPEG nếu trình duyệt không hỗ trợ WebP). Ví dụ: PNG 3000×2000 từ 119 KB còn 8 KB.
-4. Đẩy lên `uploads/<thời-điểm>.webp`, tạo commit `chore: upload background`.
-5. Tự chọn **Tuỳ chỉnh** với link `https://raw.githubusercontent.com/<repo>/<commit>/uploads/…`, trạng thái chuyển **Chưa lưu**.
-6. **Bấm Áp dụng** để thiệp dùng ảnh này.
-
-Ảnh dùng được ngay, không phải chờ Pages build, vì link gắn với commit cụ thể. Ảnh nằm trong repo public. Ảnh cũ không tự xoá, xem cách dọn ở [deployment-and-ops.md](deployment-and-ops.md#dọn-ảnh-cũ).
+2. Kiểm tra: phải là ảnh, ≤ 25MB.
+3. Nén ngay trên máy: cạnh dài tối đa 2400px, WebP 82% (JPEG nếu trình duyệt không hỗ trợ WebP). Ảnh quá chi tiết thì tự nén nhỏ dần (1800, 1400, 1000px) cho tới khi < 1 MB, vì mỗi ảnh là một document Firestore.
+4. Mã hoá rồi lưu vào `invites/<mã thiệp>/photos/<mã ảnh>`; ô ảnh nhận giá trị `fs:<mã ảnh>`, trạng thái chuyển **Chưa lưu**.
+5. **Bấm Áp dụng** để thiệp dùng ảnh này.
 
 ## Xem trước
 

@@ -9,6 +9,29 @@
   - Ghi chú gợi ý: *Premium dark + gold accent*.
   - Chữ thân bài đổi sang **Be Vietnam Pro** vì font này được thiết kế cho tiếng Việt.
 
+## Kiểu thiệp (styles)
+
+Kiểu thiệp (`STYLES` trong `shared.js`, CSS trong `styles.css`, hoạ tiết/hiệu ứng trong `styles.js`) độc lập với bảng màu: 6 kiểu × 4 bảng màu đều dùng được. Mọi font đều có subset `vietnamese` trên Google Fonts; `check.mjs` kiểm tra lại khi chạy.
+
+| Kiểu | Tham chiếu (skill ui-ux-pro-max) | Font tiêu đề / thân / chữ ký | Đặc trưng | Hiệu ứng |
+|---|---|---|---|---|
+| Tối giản `minimal` | Minimalism & Swiss | Cormorant / Be Vietnam Pro / Cormorant nghiêng | Như mô tả bên dưới | Chữ hiện từng từ |
+| Cổ điển `vintage` | Vintage Analog (film grain) | Old Standard TT / Be Vietnam Pro / Dancing Script | Khung viền đôi + hình thoi, hoa văn góc ở bìa, vân hạt giấy, nút viền `double` | Nút "Mở thư" là dấu sáp, xoay và bung khi mở |
+| Tạp chí `editorial` | Editorial Grid / Magazine | Bricolage Grotesque 800 / Be Vietnam Pro | Chữ rất lớn căn trái, đánh số 01–04, drop cap, số ngày khổng lồ; màn ≥ 900px chia cột nhãn + nội dung | Chữ trượt lên theo hàng |
+| Lãng mạn `romance` | Cặp font thiệp cưới Great Vibes / Cormorant | Cormorant / Be Vietnam Pro / Great Vibes | Căn giữa, cành hoa line-art tự vẽ ra. Script chỉ cho tên, chữ ký, lời cảm ơn; thứ và giờ dùng Cormorant nghiêng cho dễ đọc | Cánh hoa rơi chậm; hoa bung khi đồng ý |
+| Vui tươi `playful` | Neubrutalism | Baloo 2 / Nunito | Card viền 2.5px, bóng lệch cứng, bo nhẹ, nghiêng xen kẽ; tag đen chỉ ở bìa; số ngày trong hình tròn | Nút nảy (spring), confetti khi đồng ý |
+| Đáng yêu `cute` | Claymorphism | Mali / Nunito | Nền chấm bi, card viền 3px bo 24px + viền trong kiểu đất sét, số ngày trong trái tim | Nút "Mở thư" hình tim đập; tim bay lên khi đồng ý |
+
+**Quy tắc khi sửa/thêm kiểu (tránh vẻ "do AI làm"):**
+- Chỉ dùng 5 token màu (và `color-mix` của chúng), không mã màu cố định. Chữ thân bài luôn trên nền `--bg`; chữ trên nền `--accent` luôn là `--bg` (≥ 4.5:1 theo bảng màu bên dưới).
+- Không gradient trang trí, không kính mờ, không emoji, không icon lấp lánh. Hoạ tiết là SVG nét mảnh vẽ bằng `currentColor`.
+- Không lặp một motif ở mọi nơi (vd. hàng 3 trái tim, tag ở mọi nhãn). Mỗi kiểu có 1–2 dấu ấn riêng.
+- Font script chỉ cho chữ ≥ 1.6rem (tên, chữ ký), không cho số và thông tin cần đọc nhanh.
+- Hiệu ứng chạy bằng Web Animations/CSS, tắt hết khi `prefers-reduced-motion`.
+- Nút cao ≥ 44px trong mọi kiểu (nút từ chối kiểu "né" dựa vào kích thước nút).
+
+**Thêm một kiểu:** thêm dòng vào `STYLES` (font tiêu đề, tuỳ chọn `body`/`script`), viết rule `[data-style=<key>]` trong `styles.css`, hoạ tiết/hiệu ứng (nếu có) trong `styles.js`. Admin tự sinh ô chọn. Thêm key vào vòng lặp kiểu trong `check.mjs`.
+
 ## Màu (`THEMES` trong `shared.js`)
 
 Mỗi theme có 5 token, được gán vào CSS variable trên `<html>`:
@@ -40,13 +63,13 @@ Trang admin cố định bảng màu Ivory, thêm `--panel #FFF`, `--ok #4F6B55`
 |---|---|---|
 | Tiêu đề (`--display`) | Cormorant Garamond, Playfair Display hoặc Lora (chọn trong admin), 400 | `clamp(2.6rem, 10.5vw, 4.25rem)`, line-height 1.08, `text-wrap: balance` |
 | Số ngày | font tiêu đề | `clamp(6rem, 30vw, 9.5rem)` |
-| Chữ nghiêng (chữ ký, thứ, lời cảm ơn) | font tiêu đề, italic | 1.6–1.75rem |
+| Chữ nghiêng (chữ ký, thứ, lời cảm ơn) | `--script` (mặc định = font tiêu đề, italic) | 1.6–1.75rem |
 | Thân bài (`--body`) | Be Vietnam Pro 300 | 1rem / 1.75, lời nhắn 1.05rem |
 | Nhãn (`.eyebrow`) | Be Vietnam Pro 400, CHỮ HOA | 0.75rem, `letter-spacing: .28em`, màu muted |
 | Nút | Be Vietnam Pro 400, CHỮ HOA | 0.75rem, `letter-spacing: .24em` |
 
 - Tất cả font đều hỗ trợ tiếng Việt. Khi tải font, trang chờ font tiêu đề có sẵn glyph "Ểm" (chữ có dấu chồng) trước khi hiện.
-- Một request Google Fonts gồm font tiêu đề và Be Vietnam Pro, `display=swap`.
+- Một request Google Fonts gồm mọi font của kiểu thiệp (tiêu đề, thân bài, chữ ký) và Be Vietnam Pro, `display=swap`.
 - Số dùng `lining-nums` (số cao đều). Đếm ngược và giờ dùng thêm `tabular-nums` (số rộng đều).
 
 ## Khoảng cách và bố cục

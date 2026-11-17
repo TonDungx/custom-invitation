@@ -17,7 +17,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Một lời mời">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preconnect" href="https://api.github.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="stylesheet" href="board.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +26,7 @@
   --bg: #F7F4EE; --fg: #1C1917; --muted: #6B635A; --line: #DDD5C8; --accent: #8A6A3B;
   --display: "Cormorant Garamond", serif;
   --body: "Be Vietnam Pro", system-ui, sans-serif;
+  --script: var(--display); --script-style: italic; /* signature, weekday, thanks */
   --ease: cubic-bezier(.16, 1, .3, 1); /* expo-out: quick start, long soft settle */
   --ease-io: cubic-bezier(.77, 0, .18, 1);
 }
@@ -60,7 +61,7 @@ section + section { border-top: 1px solid var(--line); }
 
 .eyebrow { font-size: .75rem; font-weight: 400; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); }
 .display { font: 400 clamp(2.6rem, 10.5vw, 4.25rem)/1.08 var(--display); letter-spacing: -.01em; text-wrap: balance; }
-.italic { font-family: var(--display); font-style: italic; }
+.italic { font-family: var(--script); font-style: var(--script-style); }
 .rule { width: 3rem; height: 1px; background: var(--accent); margin-block: 2rem; transform-origin: left; }
 
 /* Reveal: opacity + transform only (GPU, no layout). */
@@ -230,6 +231,9 @@ footer { padding-block: 3rem calc(3rem + env(safe-area-inset-bottom)); text-alig
   .cue i::after { animation: none; transform: none; }
 }
 </style>
+<!-- Per-style overrides ([data-style=…] on <html>, set by applyStyle). Minimal = the rules above. -->
+<link rel="stylesheet" href="styles.css">
+<script src="firebase-config.js"></script>
 <script src="shared.js"></script>
 </head>
 <body class="locked">
@@ -241,6 +245,7 @@ footer { padding-block: 3rem calc(3rem + env(safe-area-inset-bottom)); text-alig
 <div class="sb" id="sb" aria-hidden="true" hidden><i></i></div>
 
 <script type="module">
+import { ORN, celebrate, ambient } from './styles.js';
 const $ = s => document.querySelector(s);
 // Monoline icons, one stroke weight, so they read as a set.
 const svg = p => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
@@ -263,13 +268,18 @@ function render() {
   const timeText = valid ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
   const reply = safeUrl(cfg.reply);
   const free = freeLayout(cfg);
+  const orn = ORN[styleKey(cfg)] || {};
+  // Divider: a hairline, or the style's ornament (drawn in --accent).
+  const rule = (d, x = '') => `<div class="rule${x}" data-r style="--d:${d}" aria-hidden="true">${orn.rule || ''}</div>`;
   document.title = `Gửi ${cfg.to}`;
 
   $('#cover').innerHTML = `
+    ${orn.frame || ''}
     <div class="cover-in">
+      ${orn.cover ? `<div class="orn" data-r aria-hidden="true">${orn.cover}</div>` : ''}
       <p class="eyebrow" data-r style="--d:1">Một lời mời dành cho</p>
       <h1 class="display words" data-r style="--d:2">${words(cfg.to)}</h1>
-      <div class="rule" data-r style="--d:4"></div>
+      ${rule(4)}
       <p class="eyebrow" data-r style="--d:5">${esc(dateText)}</p>
       <div data-r style="--d:6"><button class="btn" id="open" type="button">Mở thư</button></div>
     </div>`;
@@ -281,7 +291,7 @@ function render() {
     </section>` : `<section class="letter"><div class="wrap">
       <p class="eyebrow" data-r>Gửi ${esc(cfg.to)},</p>
       <h2 class="display words" data-r style="margin-top:1.5rem;--d:1">${words(cfg.title)}</h2>
-      <div class="rule" data-r style="--d:3"></div>
+      ${rule(3)}
       <p class="msg" data-r style="--d:4">${esc(cfg.message)}</p>
       <p class="sign italic" data-r style="--d:5">— ${esc(cfg.from)}</p>
     </div></section>`}
@@ -291,13 +301,13 @@ function render() {
       <p class="day" data-r style="--d:1">${pad(d.getDate())}</p>
       <p class="eyebrow" data-r style="--d:2">Tháng ${d.getMonth() + 1} · ${d.getFullYear()}</p>
       <p class="italic" data-r style="--d:3">${esc(weekday)}, ${timeText}</p>
-      <div class="rule" data-r style="--d:4"></div>
+      ${rule(4)}
       <div class="count" id="count" data-r style="--d:5" aria-label="Thời gian còn lại">
         ${['Ngày', 'Giờ', 'Phút', 'Giây'].map(l => `<div><b>00</b><small>${l}</small></div>`).join('')}
       </div>
     </div></section>` : ''}
 
-    ${cfg.stops?.length ? `<section><div class="wrap">
+    ${cfg.stops?.length ? `<section class="sched"><div class="wrap">
       <p class="eyebrow" data-r>Lịch trình</p>
       <ol class="stops" data-r>
         ${cfg.stops.map((s, i) => {
@@ -336,9 +346,10 @@ function render() {
       </div>
     </div></section>
 
-    <footer><p class="eyebrow">${esc(cfg.from)} &amp; ${esc(cfg.to)}</p></footer>`;
+    <footer><p class="eyebrow">${esc(cfg.from)} &amp; ${esc(cfg.to)}</p>
+      ${cfg.demo ? `<p style="margin-top:1.5rem"><a class="btn" href="admin/">Tạo thiệp của bạn</a></p>` : ''}</footer>`;
 
-  $('#yes').onclick = () => { $('#rsvp').classList.add('yes'); notify('accept'); };
+  $('#yes').onclick = () => { $('#rsvp').classList.add('yes'); celebrate(styleKey(cfg), $('#yes'), calm()); notify('accept'); };
   setupDecline();
   $('#ics')?.addEventListener('click', () => downloadIcs(d));
   $('#open').onclick = openCover;
@@ -512,6 +523,7 @@ function openCover() {
   setTimeout(() => reveal($('#app')), 200); // overlap with the cover fade: no empty beat
   showCue();
   queueSb();
+  celebrate(styleKey(cfg), $('#open'), calm(), 'open');
   c.addEventListener('transitionend', e => { if (e.target === c) c.hidden = true; }, { once: true });
 }
 
@@ -550,8 +562,8 @@ function downloadIcs(d) {
 }
 
 async function boot(first) {
-  cfg = await readConfig('config.json');
-  if (cfg.locked) return showLocked();
+  cfg = await readConfig();
+  if (cfg.locked || cfg.missing) return showLocked(cfg.missing);
   await Promise.race([applyStyle(cfg), new Promise(r => setTimeout(r, 1500))]);
   render();
   hydrateImages($('#app'));
@@ -562,7 +574,8 @@ async function boot(first) {
   if (cfg.intro && !opened) {
     c.hidden = false; c.classList.remove('out');
     document.body.classList.add('locked');
-    requestAnimationFrame(() => requestAnimationFrame(() => reveal(c, false)));
+    // Fixed + always on screen: reveal all at once (stagger comes from --d), no observer margin to fall into.
+    requestAnimationFrame(() => requestAnimationFrame(() => reveal(c, true)));
   } else {
     c.hidden = true; document.body.classList.remove('locked');
     reveal($('#app'), !first); // live edits from admin: no re-animation
@@ -570,16 +583,18 @@ async function boot(first) {
   }
   document.body.classList.add('ready');
   queueSb();
+  ambient(styleKey(cfg), calm());
 }
 
-// Encrypted config without the key in the link: never show placeholder content.
-function showLocked() {
+// No key in the link, or no such invite: never show placeholder content.
+function showLocked(missing) {
   $('#cover').hidden = true; document.body.classList.remove('locked');
   $('#app').innerHTML = `<section class="locked-msg"><div class="wrap">
     <p class="eyebrow">Một lời mời</p>
-    <h1 class="display" style="margin-top:1.25rem">Thiệp này cần link đầy đủ</h1>
+    <h1 class="display" style="margin-top:1.25rem">${missing ? 'Không mở được thiệp' : 'Thiệp này cần link đầy đủ'}</h1>
     <div class="rule" style="margin-inline:auto"></div>
-    <p class="msg">Link bạn mở thiếu phần mã sau dấu <b>#</b>. Hãy mở lại đúng link đã được gửi cho bạn.</p>
+    <p class="msg">${missing ? 'Thiệp không còn tồn tại, hoặc mạng đang có vấn đề. Kiểm tra kết nối rồi tải lại trang.'
+      : 'Link bạn mở thiếu phần mã sau dấu <b>#</b>. Hãy mở lại đúng link đã được gửi cho bạn.'}</p>
   </div></section>`;
   document.body.classList.add('ready');
 }

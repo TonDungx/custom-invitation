@@ -1,6 +1,7 @@
 // Device emulation check (not a real phone): WebKit (Safari engine) + Chromium mobile, incl. in-app browser UAs.
-// Run once:  npm i --no-save playwright-core && npx playwright@1.48.2 install webkit
-// Then:      node check-devices.mjs        (screenshots go to $OUT or the OS temp dir)
+// Run once:  npm i --no-save playwright-core && npx playwright-core install webkit
+// Then:      npx firebase-tools@13.35.1 emulators:exec --only auth,firestore --project demo-invite "node check-devices.mjs"
+//            (invites are seeded into the local Firestore emulator; screenshots go to $OUT or the OS temp dir)
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,10 +14,10 @@ import { chromium, webkit, devices } from 'playwright-core';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.OUT || os.tmpdir();
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.jpg': 'image/jpeg' };
-let configBody = '';
+const FB_CFG = "const FIREBASE = { apiKey: 'fake', authDomain: 'localhost', projectId: 'demo-invite', emulator: '127.0.0.1' };";
 const srv = http.createServer((q, r) => {
   const p = decodeURIComponent(new URL(q.url, 'http://x').pathname);
-  if (p === '/config.json') { r.writeHead(200, { 'content-type': 'application/json' }); return r.end(configBody); }
+  if (p === '/firebase-config.js') { r.writeHead(200, { 'content-type': 'text/javascript' }); return r.end(FB_CFG); }
   let f = path.join(ROOT, p);
   if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
   if (!fs.existsSync(f)) { r.writeHead(404); return r.end(); }
@@ -31,7 +32,20 @@ const aes = await wc.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt
 async function encrypt(obj) {
   const iv = wc.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await wc.subtle.encrypt({ name: 'AES-GCM', iv }, aes, new TextEncoder().encode(JSON.stringify(obj))));
-  return JSON.stringify({ v: 1, enc: b64u(Buffer.concat([iv, ct])) });
+  return b64u(Buffer.concat([iv, ct]));
+}
+// Store an invite in the Firestore emulator as a signed-in (emulator) user, like the admin does. -> invite id
+const DB = 'http://127.0.0.1:8080/v1/projects/demo-invite/databases/(default)/documents';
+const sess = await (await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake', { method: 'POST',
+  headers: { 'content-type': 'application/json' }, body: JSON.stringify({ requestUri: 'http://localhost', returnSecureToken: true,
+    postBody: `id_token=${encodeURIComponent(JSON.stringify({ sub: 'devices', email: 'd@example.com' }))}&providerId=google.com` }) })).json();
+async function seed(cfg) {
+  const id = b64u(wc.getRandomValues(new Uint8Array(15)));
+  const r = await fetch(`${DB}/invites/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + sess.idToken },
+    body: JSON.stringify({ fields: { owner: { stringValue: sess.localId }, enc: { stringValue: await encrypt(cfg) }, v: { integerValue: '1' },
+      updated: { timestampValue: new Date().toISOString() } } }) });
+  assert.ok(r.ok, 'seed invite: ' + r.status);
+  return id;
 }
 
 const date = `${new Date().getFullYear() + 1}-02-14T19:00`;
@@ -57,14 +71,14 @@ const runs = [
 
 const results = [];
 for (const [layoutName, cfg] of [['mẫu', base], ['tự thiết kế', free]]) {
-  configBody = await encrypt(cfg);
+  const id = await seed(cfg);
   for (const [name, engine, dev, inApp] of runs) {
     const b = await engine.launch(engine === chromium ? { channel: 'chrome' } : {});
     const ctx = await b.newContext(dev), p = await ctx.newPage(), errs = [];
     p.on('pageerror', e => errs.push(e.message));
     const tag = `${name} / ${layoutName}`, file = (name + '-' + layoutName).replace(/[^\w]+/g, '_');
     try {
-      await p.goto(BASE + '#k=' + KEY); await p.waitForSelector('body.ready', { timeout: 15000 });
+      await p.goto(BASE + '?i=' + id + '#k=' + KEY); await p.waitForSelector('body.ready', { timeout: 15000 });
       assert.ok(!(await p.isVisible('.locked-msg')), 'decrypts with #k');
       await p.tap('#open'); await p.waitForTimeout(2600);
       const vw = await p.evaluate(() => innerWidth);

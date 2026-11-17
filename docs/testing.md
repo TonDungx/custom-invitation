@@ -4,35 +4,26 @@
 
 ```bash
 npm i --no-save playwright-core     # chỉ cài tạm, không tạo package.json
-node check.mjs                      # dùng Google Chrome đã cài trên máy (channel: 'chrome')
-OUT=./shots node check.mjs          # tuỳ chọn: lưu ảnh chụp màn hình vào thư mục khác (mặc định: thư mục tạm của hệ điều hành)
+# Rules + end-to-end + thiết bị, trên Firebase Emulator (project giả demo-invite, không đụng project thật):
+npx firebase-tools@13.35.1 emulators:exec --only auth,firestore --project demo-invite "node check-rules.mjs && node check.mjs"
+npx firebase-tools@13.35.1 emulators:exec --only auth,firestore --project demo-invite "node check-devices.mjs"   # cần: npx playwright-core install webkit
+OUT=./shots …                       # tuỳ chọn: thư mục lưu ảnh chụp (mặc định: thư mục tạm của hệ điều hành)
 ```
 
-Kết quả mong đợi (khoảng 30–40 giây):
+Kết quả mong đợi:
 ```
-upload: uploads/<số>.webp 121917 -> 7876 bytes
+rules: all checks passed
+upload: <mã ảnh> 121917 -> 7904 bytes
 all checks passed, no JS errors
 ```
-Một assert sai thì script dừng với `AssertionError` và thông báo của assert đó. Có lỗi JS trên trang thì in `ERRORS:` và thoát với mã 1.
-
-Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã cài.
+Yêu cầu: Node 18+ (đã chạy trên Node 24), Google Chrome, **Java 11+** cho emulator. `firebase-tools` 13.x chạy được với Java 11; bản 14+ cần Java mới hơn [Unverified]. Emulator ghi `firestore-debug.log` (đã gitignore).
 
 ## Cách hoạt động
 
-- **Server tĩnh** viết bằng `node:http` ở cổng 5178. Phải trả đúng `Content-Type` cho `.css`: trình duyệt bỏ qua stylesheet có kiểu `text/plain` (từng làm vỡ toàn bộ trang thiết kế trong test), phục vụ thư mục dự án. Đường dẫn là thư mục thì trả `index.html` (giống cách Vercel và Netlify phục vụ `/admin`).
-- **GitHub API giả lập** bằng `ctx.route('https://api.github.com/**')`:
-
-  | Request | Phản hồi giả |
-  |---|---|
-  | `PUT …/contents/uploads/…` | Ghi lại ảnh, trả `commit.sha = "c0ffee"` |
-  | `PUT …/contents/config.json` | Ghi lại nội dung vào biến `stored`, trả `content.sha = "sha<n>"` |
-  | `GET` khi chưa có `stored` | 404 |
-  | `GET` với `Accept: …raw…` | JSON thô |
-  | `GET` thường | `{ sha, content: base64 }` |
-
-  Mọi PUT đều phải có `Authorization: Bearer test-token`.
-- **`/config.json` local** cũng được route sang `stored`, vì trên localhost `repoFromLocation()` trả về `''` nên trang thiệp đọc `./config.json`.
-- **Không ghi gì vào GitHub thật.**
+- **Server tĩnh** viết bằng `node:http`. Phải trả đúng `Content-Type` cho `.css` (trình duyệt bỏ qua stylesheet kiểu `text/plain`). Thư mục thì trả `index.html`.
+- **Firebase Emulator:** Auth (9099) + Firestore (8080) với `firestore.rules` thật. Test route `firebase-config.js` sang cấu hình emulator. Đăng nhập Google giả bằng `window.__testSignIn(sub, email)` (chỉ có khi `FIREBASE.emulator` được đặt).
+- **`config.json` thật trong repo không bao giờ được đọc trong test** (route trả 404 hoặc thiệp cũ giả); ảnh `raw.githubusercontent.com` cũng được giả lập.
+- **`check-rules.mjs`** gọi thẳng REST của emulator với 2 người dùng để kiểm tra Rules: ẩn danh/người lạ không tạo, sửa, xoá, liệt kê được thiệp của người khác; đọc 1 thiệp bằng mã thì được (chỉ thấy bản mã hoá); ảnh > 1 MB bị chặn, ảnh không sửa được; khoá trong `users/{uid}` chỉ chủ đọc được; alias chỉ trỏ được tới thiệp của mình.
 
 ## Danh sách kiểm tra
 
@@ -82,8 +73,13 @@ Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã c
 | Điện thoại 390×844: bản dọc phủ kín, tâm phần tử đúng (cx%, cy%) trong 2px | Hiển thị |
 | Laptop 1280×800: hiện bản ngang | Chọn bản theo hướng |
 | Laptop khi chưa có bản ngang: bản dọc ở giữa, tỷ lệ 390:844 | Dự phòng |
-| `config.json` lưu dạng `{v, enc}`, không chứa chữ "Linh"; giải mã bằng khoá trong `localStorage` ra đúng nội dung | Mã hoá khi lưu |
-| Ảnh tải lên là `uploads/*.bin`, không còn chữ ký `WEBP`, giải mã ra ảnh 2400×1600; link `enc:https://raw…/c0ffee/…` | Mã hoá ảnh |
+| Chưa đăng nhập thì màn đăng nhập che admin; đăng nhập lần đầu tự tạo thiệp, mã thiệp trên URL | Tài khoản |
+| `invites/{id}` có `owner` = uid, `enc` không chứa chữ "Linh"; khoá lưu theo từng thiệp; link chia sẻ có `?i=` | Mã hoá khi lưu |
+| Ảnh tải lên là bytes trong `invites/{id}/photos`, không còn chữ ký `WEBP`, giải mã ra ảnh 2400×1600; giá trị `fs:<mã>` | Mã hoá ảnh |
+| Tài khoản thứ 2 không thấy thiệp của tài khoản 1; nhập thiệp cũ (dán link cũ) → nội dung + 2 ảnh cũ chuyển sang Firestore, giữ khoá | Tách tài khoản, chuyển dữ liệu |
+| Link cũ `…/#k=` mở được **trước** khi nhập (đọc `config.json` cũ) và **sau** khi nhập (qua alias) | Link đã gửi không chết |
+| Tạo thiệp thứ 2, xoá thiệp, đăng xuất; dọn ảnh chỉ xoá ảnh không dùng | Quản lý thiệp |
+| `?i=` không tồn tại → "Không mở được thiệp"; không có `?i=` → thiệp demo + nút "Tạo thiệp của bạn" | Trạng thái lỗi |
 | Trình duyệt mới không có khoá: chỉ hiện "cần link đầy đủ", không có nội dung; mở với `#k=` thì đọc được | Riêng tư |
 | Gửi thử → sự kiện `test`; mở thiệp (bật notifyOpen) → đúng 1 `open`; Đồng ý → `accept` kèm tên và ngày; xem trước trong admin → 0 thông báo | Thông báo |
 | Link Google Calendar có đúng `dates`; `.ics` có `VALARM` −2 giờ; dòng nhắc chỉ hiện với User-Agent Messenger | Lịch |
@@ -106,7 +102,7 @@ Các chế độ smoke, vanish, off được nạp bằng hash: gọi `pack({...
 npm i --no-save playwright-core && npx playwright@1.48.2 install webkit   # 1 lần
 node check-devices.mjs
 ```
-Tạo một `config.json` đã mã hoá (bằng Node WebCrypto, cùng định dạng với `shared.js`) và mở trang thiệp bằng `#k=`. Chạy 6 cấu hình × 2 bố cục (mẫu, tự thiết kế):
+Ghi một thiệp đã mã hoá (Node WebCrypto, cùng định dạng với `shared.js`) vào Firestore Emulator và mở trang thiệp bằng `?i=…#k=…`. Chạy 6 cấu hình × 2 bố cục (mẫu, tự thiết kế):
 
 | Thiết bị | Engine |
 |---|---|
@@ -132,6 +128,6 @@ Kiểm tra trên mỗi máy:
 
 ## Chưa có kiểm tra tự động cho
 - Safari thật trên iPhone, Firefox (`check-devices.mjs` chỉ giả lập bằng WebKit và Chrome).
-- GitHub API thật (rate limit, token hết hạn).
+- Firebase thật: đăng nhập bằng popup Google thật, hạn mức gói Spark, domain được phép (cần thử tay sau khi cài đặt, xem [firebase-setup.md](firebase-setup.md)).
 - Trình duyệt trong Messenger, Zalo.
 - Hiệu ứng View Transition và thanh tiến độ CSS (chỉ chạy trên trình duyệt hỗ trợ).

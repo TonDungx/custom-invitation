@@ -84,12 +84,12 @@ function createEditor({ mount, getCfg, onChange, upload }) {
     $('[data-act=undo]').disabled = !undo.length; $('[data-act=redo]').disabled = !redo.length;
     if (!d) { props.innerHTML = ''; return; }
     // WYSIWYG: the invite's theme, font and background, scoped to the board.
-    const c = getCfg(), t = THEMES[c.theme] || THEMES.ivory, fo = FONTS[c.font] || FONTS.cormorant;
+    const c = getCfg(), t = THEMES[c.theme] || THEMES.ivory, fo = styleFonts(c);
     const img = bgUrl(c.bg, 960);
     loadFont(fo);
     const bimg = board.style.getPropertyValue('--bimg');
     board.style.cssText = `--bg:${t.bg};--fg:${t.fg};--muted:${t.muted};--accent:${t.accent};--line:${t.line};` +
-      `--display:${fo.display};--body:"Be Vietnam Pro",system-ui,sans-serif;color:${t.fg};background-color:${t.bg};` +
+      `--display:${fo.display};--body:${fo.body};color:${t.fg};background-color:${t.bg};` +
       `--bimg:${bimg || 'none'};--bx:${num(c.bgX, 0, 100, 50)}%;--by:${num(c.bgY, 0, 100, 50)}%;` +
       `--bz:${num(c.bgZoom, 100, 300, 100) / 100};--bdim:${img ? num(c.bgDim, 0, 95, 70) / 100 : 0};--bblur:${num(c.bgBlur, 0, 100, 0) / 100 * BLUR_MAX_PX * .6}px`;
     if (board.dataset.bg !== img) { board.dataset.bg = img; imageSrc(img).then(u => { if (board.dataset.bg === img) board.style.setProperty('--bimg', u ? `url("${u}")` : 'none'); }); }

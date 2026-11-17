@@ -8,11 +8,12 @@
 <title>Cấu hình thiệp</title>
 <script>/* relative paths need a trailing slash: /admin -> /admin/ */
 if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);</script>
-<link rel="preconnect" href="https://api.github.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Be+Vietnam+Pro:wght@300;400;500&display=swap">
 <link rel="stylesheet" href="admin.css">
+<script src="../firebase-config.js"></script>
 <script src="../shared.js"></script>
 <script src="common.js"></script>
 </head>
@@ -20,10 +21,21 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
 <header>
   <h1>Thiệp mời <em>· cấu hình</em></h1>
   <div class="bar">
+    <select id="inv" class="inv" aria-label="Chọn thiệp" hidden></select>
     <p class="status" id="status" role="status"><span>Đang tải…</span></p>
     <a class="btn ghost" id="view" href="../" target="_blank" rel="noopener">Mở trang</a>
     <button class="btn" id="copy" type="button">Sao chép link</button>
     <button class="btn solid" id="apply" type="button" disabled>Áp dụng</button>
+    <details class="acct" id="acct" hidden>
+      <summary aria-label="Tài khoản"><span id="avatar" aria-hidden="true"></span></summary>
+      <div class="menu">
+        <p class="hint" id="who"></p>
+        <button type="button" id="newInv">Thiệp mới</button>
+        <button type="button" id="import" hidden>Nhập thiệp cũ (từ GitHub)</button>
+        <button type="button" id="delInv">Xoá thiệp này</button>
+        <button type="button" id="logout">Đăng xuất</button>
+      </div>
+    </details>
   </div>
 </header>
 
@@ -38,7 +50,6 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
       <li><a href="#s-style">Phong cách</a></li>
       <li><a href="#s-bg">Ảnh nền</a></li>
     </ol>
-    <button class="btn ghost gh" id="gh" type="button">Kết nối GitHub</button>
   </nav>
 
   <form id="f" autocomplete="off" onsubmit="return false">
@@ -109,7 +120,9 @@ if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname +
 
     <fieldset id="s-style">
       <legend>Phong cách</legend>
-      <p class="lbl" style="margin-bottom:.75rem">Bảng màu</p>
+      <p class="lbl" style="margin-bottom:.75rem">Kiểu thiệp</p>
+      <div class="choices styles" id="styles"></div>
+      <p class="lbl" style="margin:1.5rem 0 .75rem">Bảng màu</p>
       <div class="choices" id="themes"></div>
       <p class="lbl" style="margin:1.5rem 0 .75rem">Font tiêu đề</p>
       <div class="choices" id="fonts"></div>
@@ -177,10 +190,18 @@ let lay = { portrait: null, landscape: null };
 
 $('#themes').innerHTML = Object.entries(THEMES).map(([k, t]) =>
   `<label class="choice"><input type="radio" name="theme" value="${k}"><span><i style="background:linear-gradient(135deg,${t.bg} 50%,${t.accent} 50%)"></i>${t.label}</span></label>`).join('');
-$('#fonts').innerHTML = Object.entries(FONTS).map(([k, x]) =>
-  `<label class="choice"><input type="radio" name="font" value="${k}"><span style="font-family:${x.display.replace(/"/g, "'")};font-size:1.2rem">${x.label}</span></label>`).join('');
+const ff = s => s.replace(/"/g, "'");
+// Style tiles: name in the style's own title font + one-line hint.
+$('#styles').innerHTML = Object.entries(STYLES).map(([k, x]) =>
+  `<label class="choice"><input type="radio" name="style" value="${k}"><span><b style="font-family:${ff(FONTS[x.font].display)}">${x.label}</b><small>${x.hint}</small></span></label>`).join('');
+$('#fonts').innerHTML = [['auto', { label: 'Theo kiểu thiệp', display: 'inherit' }], ...Object.entries(FONTS)].map(([k, x]) =>
+  `<label class="choice"><input type="radio" name="font" value="${k}"><span style="font-family:${ff(x.display)};font-size:${k === 'auto' ? '.9rem' : '1.2rem'}">${x.label}</span></label>`).join('');
+// Preview fonts: only the glyphs of the labels (text=), one request.
 document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet',
-  href: 'https://fonts.googleapis.com/css2?' + Object.values(FONTS).map(x => 'family=' + x.q.split(':')[0]).join('&') + '&display=swap&text=CormantPlayfiLdse' }));
+  href: 'https://fonts.googleapis.com/css2?' + Object.values(FONTS).map(x => 'family=' + x.q.split(':')[0]).join('&') + '&display=swap&text=' +
+    encodeURIComponent([...new Set([...Object.values(FONTS), ...Object.values(STYLES)].map(x => x.label).join(''))].join('')) }));
+// A new style brings its own title font.
+f.addEventListener('change', e => { if (e.target.name === 'style') f.elements.font.value = 'auto'; });
 
 // "none" not "": RadioNodeList.value = '' does not check a radio in Chrome.
 $('#bgs').innerHTML = [['none', 'Không', ''], ...Object.entries(BACKGROUNDS).map(([k, b]) => [k, b.label, unsplash(b.id, 160)]), ['custom', 'Tuỳ chỉnh', '']]
@@ -231,7 +252,8 @@ function addStop(s = {}) {
 }
 function fill(c) {
   TEXT.forEach(k => f.elements[k].value = c[k] ?? '');
-  f.elements.theme.value = c.theme; f.elements.font.value = c.font; f.elements.intro.checked = !!c.intro;
+  f.elements.theme.value = c.theme; f.elements.style.value = STYLES[c.style] ? c.style : 'minimal';
+  f.elements.font.value = FONTS[c.font] ? c.font : 'auto'; f.elements.intro.checked = !!c.intro;
   f.elements.notifyOpen.checked = !!c.notifyOpen;
   const preset = !c.bg || BACKGROUNDS[c.bg];
   f.elements.bg.value = !c.bg ? 'none' : preset ? c.bg : 'custom';
@@ -248,7 +270,7 @@ function fill(c) {
 function read() {
   const c = {};
   TEXT.forEach(k => c[k] = f.elements[k].value.trim());
-  c.theme = f.elements.theme.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
+  c.theme = f.elements.theme.value; c.style = f.elements.style.value; c.font = f.elements.font.value; c.intro = f.elements.intro.checked;
   c.notifyOpen = f.elements.notifyOpen.checked;
   c.declineMode = f.elements.declineMode.value;
   const bg = f.elements.bg.value;
@@ -273,7 +295,7 @@ function refreshState() {
 }
 
 async function update() {
-  $('#pv').src = '../index.html#' + await pack(read()); // fragment change -> no reload
+  $('#pv').src = `../index.html?i=${INVITE_ID}#` + await pack(read()); // fragment change -> no reload
   refreshState();
 }
 let t; f.addEventListener('input', () => {
@@ -283,13 +305,50 @@ let t; f.addEventListener('input', () => {
 addEventListener('beforeunload', e => { if (dirty()) e.preventDefault(); });
 
 let locked = false;
+// Sign in -> pick the invite (?i= or the newest) -> fill the form. No invite yet -> create one (or import the old one).
 async function load() {
-  const c = await fetchConfig('../config.json');
+  const u = await requireUser();
+  $('#who').textContent = u.email || u.displayName || '';
+  $('#avatar').textContent = (u.displayName || u.email || '?')[0];
+  $('#acct').hidden = false;
+  const legacy = await legacyConfig();
+  $('#import').hidden = !legacy;
+  let list = await listInvites();
+  if (!list.length) {
+    INVITE_ID = legacy && confirm('Bạn chưa có thiệp nào trong tài khoản.\n\nNhập thiệp cũ (đang lưu trong GitHub) vào tài khoản này?\nBấm Huỷ để tạo thiệp mới.')
+      ? await importOld(legacy) : await createInvite(structuredClone(DEFAULT));
+    if (!INVITE_ID) INVITE_ID = await createInvite(structuredClone(DEFAULT));
+    list = await listInvites();
+  }
+  if (!list.some(x => x.id === INVITE_ID)) INVITE_ID = list[0].id;
+  history.replaceState(null, '', '?i=' + INVITE_ID);
+  $('#inv').innerHTML = list.map(x => `<option value="${esc(x.id)}">${x.cfg.locked ? 'Thiệp chưa mở khoá' : esc(`${x.cfg.to || '—'} · ${x.cfg.title || ''}`)}</option>`).join('');
+  $('#inv').value = INVITE_ID; $('#inv').hidden = false;
+  for (const a of document.querySelectorAll('a[href="design/"]')) a.href = 'design/?i=' + INVITE_ID;
+  const c = await fetchConfig();
   locked = !!c.locked;
   fill(c); saved = json(); await update();
   $('#view').href = shareLink('../');
-  if (locked) { setStatus('Chưa mở khoá', 'error'); $('#apply').disabled = true; toast('Chưa mở khoá: cần link thiệp đầy đủ để sửa nội dung.'); }
+  if (locked) { setStatus('Chưa mở khoá', 'error'); $('#apply').disabled = true; toast('Tài khoản này không có khoá của thiệp.'); }
 }
+const go = id => { if (!dirty() || confirm('Thay đổi chưa lưu sẽ mất. Tiếp tục?')) location.search = '?i=' + id; };
+$('#inv').onchange = e => { const id = e.target.value; e.target.value = INVITE_ID; go(id); };
+$('#newInv').onclick = async () => { if (dirty() && !confirm('Thay đổi chưa lưu sẽ mất. Tiếp tục?')) return; location.search = '?i=' + await createInvite(structuredClone(DEFAULT)); };
+$('#delInv').onclick = async () => {
+  if (!confirm('Xoá hẳn thiệp này và ảnh của nó? Link đã gửi sẽ không mở được nữa.')) return;
+  await deleteInvite(INVITE_ID); location.search = '';
+};
+$('#logout').onclick = () => signOut();
+// Old invite (GitHub repo) -> this account. Key: this browser's saved key, else ask for the old link.
+async function importOld(json) {
+  let k = storedKey('');
+  for (;;) {
+    try { const id = await importLegacy(json, k); toast('Đã nhập thiệp cũ. Link cũ vẫn mở được.'); return id; }
+    catch (e) { if (!e.locked) { toast('Không nhập được (' + e.message + ').'); return ''; } }
+    if (!(k = await askKey())) return '';
+  }
+}
+$('#import').onclick = async () => { const j = await legacyConfig(); const id = j && await importOld(j); if (id) location.search = '?i=' + id; };
 
 // Save this page's fields into the latest remote config; keep the designer's layout as saved there.
 async function apply() {
@@ -302,9 +361,10 @@ async function apply() {
       layout: remote.layout || mode === 'free' ? { ...(remote.layout || {}), mode } : null }));
     if (!res) { btn.disabled = false; return refreshState(); }
     lay = { portrait: res.layout?.portrait || null, landscape: res.layout?.landscape || null };
+    $('#inv').selectedOptions[0].textContent = `${res.to || '—'} · ${res.title || ''}`;
     saved = json(); await update();
     $('#view').href = shareLink('../');
-    toast('Đã lưu (đã mã hoá). Link thiệp hiển thị nội dung mới sau khoảng 1 phút.');
+    toast('Đã lưu (đã mã hoá).');
   } catch (e) {
     setStatus('Lỗi khi lưu', 'error'); btn.disabled = false; toast('Không lưu được (' + e.message + '). Thử lại.');
   }
@@ -312,8 +372,8 @@ async function apply() {
 
 // Back from the designer tab: pick up its saved layout (and everything else if nothing is pending here).
 addEventListener('focus', async () => {
-  if (!hasToken() || locked || document.querySelector('dialog[open]')) return;
-  const c = await fetchConfig('../config.json');
+  if (!me() || !INVITE_ID || locked || document.querySelector('dialog[open]')) return;
+  const c = await fetchConfig();
   if (dirty()) lay = { portrait: c.layout?.portrait || null, landscape: c.layout?.landscape || null };
   else { fill(c); saved = json(); }
   update();
@@ -332,26 +392,13 @@ async function upload(file) {
   } finally { btn.disabled = false; btn.textContent = 'Tải ảnh từ máy'; $('#file').value = ''; }
 }
 
-// ---- Delete uploads/ files that neither the saved config nor this form uses ----
-// Each delete is one commit. Old files stay in git history (and raw links pinned to old commits keep working).
+// ---- Delete photos that neither the saved invite nor this form uses ----
 async function cleanUploads() {
-  if (!hasToken() && !(await askToken())) return;
   const btn = $('#clean'); btn.disabled = true;
   try {
-    const r = await fetch(ghApi('uploads'), { headers: authH(), cache: 'no-store' });
-    if (r.status === 404) return toast('Chưa có ảnh nào được tải lên.');
-    if (!r.ok) throw new Error(r.status);
-    const files = (await r.json()).filter(x => x.type === 'file');
-    const used = JSON.stringify([await fetchConfig('../config.json'), read()]);
-    const unused = files.filter(x => !used.includes(x.path));
-    if (!unused.length) return toast(`Không có ảnh thừa (${files.length} ảnh đều đang dùng).`);
-    if (!confirm(`Xoá ${unused.length}/${files.length} ảnh không dùng?\n\nNếu trang Thiết kế đang có ảnh mới chưa bấm Áp dụng, hãy Áp dụng ở đó trước.`)) return;
-    let n = 0;
-    for (const x of unused) {
-      const d = await fetch(ghApi(x.path), { method: 'DELETE', headers: authH(), body: JSON.stringify({ message: 'chore: remove unused photo', sha: x.sha }) });
-      if (d.ok) n++;
-    }
-    toast(`Đã xoá ${n} ảnh không dùng.`);
+    if (!confirm('Xoá ảnh không dùng của thiệp này?\n\nNếu trang Thiết kế đang có ảnh mới chưa bấm Áp dụng, hãy Áp dụng ở đó trước.')) return;
+    const [n, total] = await cleanPhotos(await fetchConfig(), read());
+    toast(n ? `Đã xoá ${n}/${total} ảnh không dùng.` : `Không có ảnh thừa (${total} ảnh đều đang dùng).`);
   } catch (e) { toast('Không dọn được ảnh (' + e.message + ').'); }
   finally { btn.disabled = false; }
 }
@@ -373,7 +420,6 @@ zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) z
 zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); upload(e.dataTransfer.files[0]); });
 
 $('#apply').onclick = apply;
-$('#gh').onclick = async () => { if (await askToken()) { await load(); toast('Đã kết nối ' + gh.repo); } };
 addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (dirty()) apply(); } });
 $('#add').onclick = () => { addStop(); stops.lastElementChild.querySelector('[data-k=time]').focus(); update(); };
 $('#copy').onclick = async () => {
@@ -381,7 +427,7 @@ $('#copy').onclick = async () => {
   try { await navigator.clipboard.writeText(link); toast(dirty() ? 'Đã sao chép. Nhớ bấm Áp dụng để lưu thay đổi.' : 'Đã sao chép link (có mã khoá, chỉ ai có link mới xem được)'); }
   catch { prompt('Sao chép link này:', link); }
 };
-$('#replay').onclick = async () => { $('#pv').src = '../index.html?r=' + Date.now() + '#' + await pack(read()); };
+$('#replay').onclick = async () => { $('#pv').src = `../index.html?i=${INVITE_ID}&r=${Date.now()}#` + await pack(read()); };
 
 // Scrollspy for the table of contents.
 const links = new Map([...document.querySelectorAll('nav a')].map(a => [a.hash.slice(1), a]));

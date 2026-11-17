@@ -38,6 +38,7 @@ h1 a:hover { color: var(--fg); }
   .editor.full .ed-props { margin-top: 1rem; }
 }
 </style>
+<script src="../../firebase-config.js"></script>
 <script src="../../shared.js"></script>
 <script src="../common.js"></script>
 <script src="../editor.js"></script>
@@ -69,7 +70,10 @@ function refreshState() {
 }
 
 async function load() {
-  base = await fetchConfig('../../config.json');
+  await requireUser();
+  if (!INVITE_ID) return location.replace('../'); // the form page picks the invite
+  $('h1 a').href = '../?i=' + INVITE_ID;
+  base = await fetchConfig();
   if (base.locked) { // encrypted and no key: never overwrite real content with defaults
     $('#apply').onclick = null; $('#apply').disabled = true;
     setStatus('Chưa mở khoá', 'error'); toast('Chưa mở khoá: cần link thiệp đầy đủ để sửa thiết kế. Tải lại trang để nhập.');
@@ -89,7 +93,7 @@ async function apply() {
     if (!res) { btn.disabled = false; return refreshState(); }
     base = { ...structuredClone(DEFAULT), ...res };
     saved = JSON.stringify(design); refreshState();
-    toast('Đã lưu thiết kế. Thiệp dùng bố cục tự thiết kế, hiển thị sau khoảng 1 phút.');
+    toast('Đã lưu thiết kế. Thiệp dùng bố cục tự thiết kế.');
   } catch (e) {
     setStatus('Lỗi khi lưu', 'error'); btn.disabled = false; toast('Không lưu được (' + e.message + '). Thử lại.');
   }
@@ -99,15 +103,15 @@ async function apply() {
 $('#preview').onclick = async () => {
   const w = window.open('', '_blank');
   const hash = await pack({ ...base, layout: { mode: 'free', ...ed.get() } });
-  if (w) w.location = new URL('../../#' + hash, location.href).href;
+  if (w) w.location = new URL(`../../?i=${INVITE_ID}#` + hash, location.href).href;
 };
 $('#apply').onclick = apply;
 addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (dirty()) apply(); } });
 addEventListener('beforeunload', e => { if (dirty()) e.preventDefault(); });
 // Back from the form tab: refresh texts/theme/background, keep the design being edited.
 addEventListener('focus', async () => {
-  if (!hasToken() || document.getElementById('dlg')?.open) return;
-  base = await fetchConfig('../../config.json'); ed.refresh();
+  if (!me() || !INVITE_ID) return;
+  base = await fetchConfig(); ed.refresh();
 });
 
 load();

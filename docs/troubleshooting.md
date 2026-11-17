@@ -3,18 +3,18 @@
 | Triệu chứng | Nguyên nhân có thể | Cách xử lý |
 |---|---|---|
 | Thiệp hiện "Thiệp này cần link đầy đủ" | Link thiếu đoạn `#k=…`, hoặc bị cắt khi copy | Gửi lại link lấy từ nút **Sao chép link** trong admin |
-| Admin hỏi "Mở khoá thiệp" | Trình duyệt này chưa có khoá | Dán link thiệp đầy đủ đã gửi (có `#k=`) |
-| Admin báo "Chưa mở khoá", nút Áp dụng bị khoá | Đã huỷ hộp mở khoá | Tải lại trang và dán link đầy đủ |
+| Thiệp hiện "Không mở được thiệp" | `?i=` sai, thiệp đã bị xoá, hoặc mất mạng | Kiểm tra mạng; lấy lại link bằng **Sao chép link** |
+| Admin chỉ hiện "Chưa cấu hình Firebase" | `firebase-config.js` còn trống | Làm theo [firebase-setup.md](firebase-setup.md) |
+| Bấm "Đăng nhập bằng Google" báo `auth/unauthorized-domain` | Domain chưa có trong Authorized domains | Firebase Console → Authentication → Settings → Authorized domains → thêm domain |
+| Popup đăng nhập bị chặn / không mở | Trình duyệt chặn popup, hoặc đang trong app Messenger/Zalo | Cho phép popup; mở admin bằng trình duyệt thường |
+| Admin hỏi "Mở khoá thiệp cũ" khi nhập | Trình duyệt này không có khoá của thiệp cũ | Dán link thiệp cũ đầy đủ đã gửi (có `#k=`) |
+| Admin báo "Chưa mở khoá", nút Áp dụng bị khoá | Tài khoản không có khoá của thiệp này | Mở thiệp bằng đúng tài khoản đã tạo nó |
 | Không nhận được mail thông báo | Chưa deploy, link sai, chưa Áp dụng sau khi dán link, mail vào Spam, script sửa mà chưa deploy bản mới | Làm lại theo [notifications.md](notifications.md); dùng nút **Gửi thử** |
 | Dán link vào Messenger không thấy ảnh xem trước | Messenger cache ảnh cũ của link | Chờ cache hết hạn, hoặc dùng Sharing Debugger của Facebook để làm mới [Unverified] |
-| Đã bấm Áp dụng nhưng link thiệp vẫn hiện nội dung cũ | Cache: API khoảng 60s; nếu bị giới hạn request thì rơi xuống Pages, cache tới 10 phút | Chờ 1–10 phút. Kiểm tra commit `chore: update invitation` đã có trên GitHub. Kiểm tra trực tiếp: `curl -s https://api.github.com/repos/TonDungx/custom-invitation/contents/config.json -H "Accept: application/vnd.github.raw+json"` |
-| Admin báo "Token hoặc repo không đúng quyền" | Token hết hạn hoặc bị thu hồi, chưa chọn đúng repo, thiếu quyền Contents: Read and write, repo nhập sai | Tạo token mới theo [admin-guide.md](admin-guide.md#kết-nối-github-lần-đầu), bấm **Kết nối GitHub** để nhập lại |
-| Admin báo "Lỗi khi lưu (5xx)" hoặc lỗi mạng | GitHub gặp sự cố hoặc mất mạng | Thử lại. Thay đổi vẫn còn trong form miễn là chưa đóng tab. |
-| Mở admin ở máy khác không thấy nút lưu hoạt động | Token chỉ lưu ở trình duyệt cũ | Nhập token (tạo mới nếu không còn) |
-| Admin hiện nội dung cũ hơn bản đã lưu | Chưa có token nên admin đọc qua API không xác thực hoặc qua Pages (có cache) | Kết nối GitHub: khi có token, admin luôn đọc bản mới nhất |
-| Trang thiết kế hiện tên, tiêu đề cũ | Trang thiết kế dùng nội dung đã lưu | Bấm Áp dụng ở form, rồi quay lại tab thiết kế (tự cập nhật nếu đã kết nối GitHub), hoặc tải lại trang |
-| Khung xem trước ở form chưa có thiết kế mới | Chưa bấm Áp dụng ở trang thiết kế, hoặc chưa kết nối GitHub nên không tự tải lại | Áp dụng ở trang thiết kế, rồi tải lại trang form |
-| `git push` bị `rejected (fetch first)` | Admin đã commit lên `main` | `git pull --rebase && git push` |
+| Admin báo "Lỗi khi lưu (403)" | Hết phiên đăng nhập, hoặc Rules trên Console khác `firestore.rules` | Tải lại trang (đăng nhập lại); dán lại Rules và Publish |
+| Admin báo "Lỗi khi lưu" khác hoặc lỗi mạng | Firebase gặp sự cố, vượt hạn mức miễn phí, hoặc mất mạng | Thử lại. Thay đổi vẫn còn trong form miễn là chưa đóng tab. |
+| Trang thiết kế hiện tên, tiêu đề cũ | Trang thiết kế dùng nội dung đã lưu | Bấm Áp dụng ở form, rồi quay lại tab thiết kế (tự cập nhật), hoặc tải lại trang |
+| Khung xem trước ở form chưa có thiết kế mới | Chưa bấm Áp dụng ở trang thiết kế | Áp dụng ở trang thiết kế, rồi quay lại tab form |
 | Sửa code xong push nhưng web chưa đổi | Pages đang build hoặc CDN cache 10 phút | `gh api repos/TonDungx/custom-invitation/pages/builds/latest --jq .status`, chờ `built` rồi thêm tối đa 10 phút |
 | Ảnh nền không hiện | URL không phải `https`, ảnh bị xoá hoặc chặn hotlink, link Unsplash chết | Dùng **Tải ảnh từ máy** thay cho link ngoài. Kiểm tra trong tab Network. |
 | Tải ảnh báo "Chỉ nhận file ảnh" | File không có kiểu `image/*` (ví dụ HEIC trên một số trình duyệt máy tính) | Đổi ảnh sang JPG hoặc PNG rồi tải lại |

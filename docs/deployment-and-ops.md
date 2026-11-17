@@ -4,7 +4,8 @@
 
 | Thành phần | Dịch vụ | Ghi chú |
 |---|---|---|
-| Mã nguồn và dữ liệu | GitHub repo `TonDungx/custom-invitation` (public) | Nhánh `main` |
+| Mã nguồn | GitHub repo `TonDungx/custom-invitation` (public) | Nhánh `main`. Không chứa nội dung thiệp (sau khi đã nhập thiệp cũ và dọn `config.json`, `uploads/`). |
+| Tài khoản + dữ liệu | Firebase Auth (Google) + Firestore, gói Spark | Cài đặt: [firebase-setup.md](firebase-setup.md). Đổi Rules: dán `firestore.rules` vào Console rồi Publish. |
 | Hosting | GitHub Pages, deploy từ `main` / thư mục gốc | Bật bằng `gh api -X POST repos/TonDungx/custom-invitation/pages -f "source[branch]=main" -f "source[path]=/"` |
 | Đọc config mới | `api.github.com` (contents API) | Không xác thực, từ trình duyệt người xem |
 | Ảnh tải lên | `raw.githubusercontent.com/<repo>/<commitSha>/uploads/…` | Đã đo: `Content-Type: image/webp`, `Cache-Control: max-age=300`, có `Access-Control-Allow-Origin: *` |
@@ -54,12 +55,12 @@ Nếu push bị từ chối với `! [rejected] main -> main (fetch first)`, g�
 - `chore: update invitation`: do admin tạo khi lưu cấu hình.
 - `chore: upload background`: do admin tạo khi tải ảnh.
 
-## Token GitHub
+## Firebase
 
-- Loại: fine-grained personal access token, chỉ cho repo này, quyền **Contents: Read and write**.
-- Lưu ở: `localStorage['invite-gh'] = {"repo":"tondungx/custom-invitation","token":"github_pat_…"}` trên trình duyệt của người cấu hình.
-- Xoay vòng: tạo token mới, vào admin bấm **Kết nối GitHub** và dán. Thu hồi token cũ ở https://github.com/settings/personal-access-tokens.
-- Token lộ: thu hồi ngay. Quyền của token chỉ giới hạn ở việc ghi nội dung repo này. Kiểm tra lịch sử commit để phát hiện thay đổi lạ.
+- Định danh project nằm trong `firebase-config.js` (công khai). Quyền nằm trong `firestore.rules`; sửa Rules thì dán lại vào Console → Firestore → Rules → **Publish** (hoặc `firebase deploy --only firestore:rules`).
+- Domain chạy admin phải nằm trong **Authentication → Settings → Authorized domains**, nếu không popup đăng nhập báo `auth/unauthorized-domain`.
+- Xem dữ liệu: Console → Firestore. Nội dung `enc` và ảnh đều là bản mã; chỉ người có khoá (link hoặc tài khoản chủ) đọc được.
+- Sao lưu: Firestore có export ra Cloud Storage (cần gói trả phí) [Unverified]; với quy mô nhỏ, mỗi chủ thiệp giữ link `#k=` là đủ để mở lại.
 
 ## Dọn ảnh cũ
 
@@ -94,7 +95,7 @@ Trên localhost:
 
 ## Chuyển sang host hoặc repo khác
 
-- **Đổi tên repo hoặc tài khoản:** không cần sửa code. `repoFromLocation()` tự suy ra từ URL `owner.github.io/repo/`. Trong admin, nhập lại repo trong hộp Kết nối GitHub.
+- **Đổi tên repo hoặc tài khoản:** không cần sửa code. Thêm domain mới vào **Authorized domains** của Firebase Auth.
 - **Tên miền riêng hoặc host khác (Netlify, Vercel…):** `repoFromLocation()` trả về `''`, nên trang thiệp chỉ đọc `config.json` trên host đó. Cần một trong hai cách:
   - Cho repo GitHub tự deploy sang host đó (Netlify/Vercel deploy theo commit, mỗi lần Áp dụng là một lần deploy).
   - Sửa `repoFromLocation()` để trả về repo cố định, giữ việc đọc qua API.
