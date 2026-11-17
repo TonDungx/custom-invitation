@@ -21,11 +21,16 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
-/* Thin themed scrollbar: standard props (Chrome 121+/Firefox) + WebKit fallback (Safari). */
-html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg) 22%, transparent) transparent; }
-::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
-::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--fg) 40%, transparent); }
+/* Native scrollbar takes layout width (page shifts when the cover unlocks scrolling).
+   Hide it and draw an overlay thumb instead (.sb), which floats above the page. */
+html { scrollbar-width: none; }
+::-webkit-scrollbar { display: none; }
+.sb { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: 12px; pointer-events: none; opacity: 0; transition: opacity .5s var(--ease); }
+.sb.on, .sb.drag, .sb:has(i:hover) { opacity: 1; transition-duration: .2s; }
+.sb i { position: absolute; top: 0; right: 0; width: 12px; pointer-events: auto; cursor: grab; touch-action: none; }
+.sb i::after { content: ""; position: absolute; inset: 2px 3px 2px auto; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--fg) 30%, transparent); transition: width .2s, background-color .2s; }
+.sb i:hover::after, .sb.drag i::after { width: 6px; background: color-mix(in srgb, var(--fg) 50%, transparent); }
+.sb.drag i { cursor: grabbing; }
 body {
   background: var(--bg); color: var(--fg);
   font: 300 1rem/1.75 var(--body);
@@ -205,6 +210,7 @@ footer { padding-block: 3rem calc(3rem + env(safe-area-inset-bottom)); text-alig
 <div class="progress" aria-hidden="true"></div>
 <main id="app"></main>
 <button class="cue" id="cue" type="button">Cuộn xuống<i aria-hidden="true"></i></button>
+<div class="sb" id="sb" aria-hidden="true" hidden><i></i></div>
 
 <script type="module">
 const $ = s => document.querySelector(s);
@@ -409,6 +415,34 @@ function reveal(root, instant) {
   els.forEach(e => io.observe(e));
 }
 
+// ---- Overlay scrollbar (thumb only; transform-positioned, shows while scrolling) ----
+const sb = $('#sb'), thumb = sb.firstElementChild;
+let sbHide, sbFrame;
+function syncSb() {
+  sbFrame = 0;
+  const vh = innerHeight, sh = document.documentElement.scrollHeight;
+  sb.hidden = sh <= vh + 1 || document.body.classList.contains('locked');
+  if (sb.hidden) return;
+  const h = Math.max(40, vh * vh / sh);
+  thumb.style.height = h + 'px';
+  thumb.style.transform = `translateY(${scrollY / (sh - vh) * (vh - h)}px)`;
+}
+const queueSb = () => { sbFrame ||= requestAnimationFrame(syncSb); };
+addEventListener('scroll', () => {
+  queueSb(); sb.classList.add('on');
+  clearTimeout(sbHide); sbHide = setTimeout(() => sb.classList.remove('on'), 1200);
+}, { passive: true });
+addEventListener('resize', queueSb);
+new ResizeObserver(queueSb).observe($('#app'));
+thumb.addEventListener('pointerdown', e => {
+  e.preventDefault(); thumb.setPointerCapture(e.pointerId); sb.classList.add('drag');
+  const y0 = e.clientY, s0 = scrollY;
+  const ratio = (document.documentElement.scrollHeight - innerHeight) / (innerHeight - thumb.offsetHeight);
+  const move = ev => scrollTo(0, s0 + (ev.clientY - y0) * ratio);
+  thumb.addEventListener('pointermove', move);
+  thumb.addEventListener('lostpointercapture', () => { thumb.removeEventListener('pointermove', move); sb.classList.remove('drag'); }, { once: true });
+});
+
 // Scroll cue: visible only at the very top of a page that still has content below.
 // Derived from scroll position every time, so it can never get stuck on (e.g. over the footer).
 let cueOn = false;
@@ -425,6 +459,7 @@ function openCover() {
   document.body.classList.remove('locked');
   setTimeout(() => reveal($('#app')), 200); // overlap with the cover fade: no empty beat
   showCue();
+  queueSb();
   c.addEventListener('transitionend', e => { if (e.target === c) c.hidden = true; }, { once: true });
 }
 
@@ -458,6 +493,7 @@ async function boot(first) {
     if (first) showCue();
   }
   document.body.classList.add('ready');
+  queueSb();
 }
 
 boot(true);

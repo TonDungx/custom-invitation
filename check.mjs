@@ -115,11 +115,22 @@ const bgState = await m.evaluate(() => ({ has: document.documentElement.classLis
 assert.ok(bgState.has && bgState.img.includes('images.unsplash.com'), 'background photo applied');
 assert.equal(bgState.blur, 'blur(12px)', '50% blur = 12px');
 await m.screenshot({ path: OUT + '/1-cover.png' });
+assert.ok(await m.locator('#sb[hidden]').count(), 'overlay scrollbar hidden while cover is up');
 await m.click('#open'); await m.waitForTimeout(2800);
 assert.ok(await m.isVisible('#cue.show'), 'scroll cue visible');
 await m.screenshot({ path: OUT + '/2-letter.png' });
 await m.mouse.wheel(0, 300); await m.waitForTimeout(800);
 assert.ok(!(await m.isVisible('#cue.show')), 'scroll cue hides after scroll');
+// Overlay scrollbar: native one hidden (no layout width), custom thumb tracks + drags.
+assert.equal(await m.evaluate(() => getComputedStyle(document.documentElement).scrollbarWidth), 'none');
+assert.ok(await m.isVisible('#sb.on i'), 'overlay thumb shows while scrolling');
+const sbBox = await m.locator('#sb i').boundingBox();
+assert.ok(sbBox.x + sbBox.width <= 390 && sbBox.x >= 390 - 12, 'thumb sits on the right edge, over the page');
+const y1 = await m.evaluate(() => scrollY);
+await m.mouse.move(sbBox.x + 6, sbBox.y + sbBox.height / 2); await m.mouse.down(); await m.mouse.move(sbBox.x + 6, sbBox.y + sbBox.height / 2 + 120, { steps: 5 }); await m.mouse.up();
+assert.ok(await m.evaluate(() => scrollY) > y1 + 200, 'dragging the thumb scrolls the page');
+await m.mouse.move(100, 400); await m.waitForTimeout(1900);
+assert.ok(!(await m.locator('#sb.on').count()), 'thumb fades when idle');
 // Regression: scrolling before the cue's delay must not leave it stuck on (it overlapped the footer).
 const m2 = await ctx.newPage(); await m2.setViewportSize({ width: 390, height: 844 });
 await m2.goto(BASE); await m2.waitForSelector('body.ready'); await m2.click('#open');
