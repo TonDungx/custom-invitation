@@ -5,7 +5,8 @@ Trang web thiệp mời hẹn hò dùng được nhiều lần, chỉnh sửa qu
 | | Link |
 |---|---|
 | Trang thiệp (link gửi đi) | https://tondungx.github.io/custom-invitation/ |
-| Trang cấu hình | https://tondungx.github.io/custom-invitation/admin |
+| Trang cấu hình (form) | https://tondungx.github.io/custom-invitation/admin |
+| Trang thiết kế (kéo thả) | https://tondungx.github.io/custom-invitation/admin/design |
 | Mã nguồn | https://github.com/TonDungx/custom-invitation |
 
 ## Mục lục
@@ -43,10 +44,13 @@ git push                     # GitHub Pages tự deploy, khoảng 1 phút
 ```
 custom-invitation/
 ├── index.html         Trang thiệp (HTML + CSS + JS inline)
-├── admin/index.html   Trang cấu hình
+├── admin/index.html   Trang cấu hình (form)
+├── admin/design/      Trang thiết kế kéo thả, toàn màn hình
+├── admin/admin.css    Style dùng chung cho 2 trang admin
+├── admin/common.js    Dùng chung cho 2 trang admin: lưu/đọc GitHub, hộp token, thông báo
 ├── shared.js          Dùng chung: mặc định, theme, font, ảnh nền, URL helper, đọc config, áp style, mô hình bố cục tự do
 ├── board.css          Style trang thiết kế tự do, dùng chung cho trang thiệp và trình chỉnh sửa (WYSIWYG)
-├── admin/editor.js    Trình thiết kế kéo thả (chế độ "Tự thiết kế")
+├── admin/editor.js    Thành phần trình thiết kế (dùng trong admin/design)
 ├── config.json        Cấu hình đã lưu (do admin ghi qua GitHub API, KHÔNG sửa tay khi admin đang mở)
 ├── uploads/           Ảnh nền tải từ máy (do admin ghi)
 ├── check.mjs          Kiểm thử end-to-end (Playwright + Chrome)

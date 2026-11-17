@@ -88,16 +88,38 @@ CSS inline trong `<style>`, JS inline trong `<script type="module">`. Các hàm 
 | `syncCue()` / `showCue()` | Gợi ý "Cuộn xuống". |
 | `downloadIcs(d)` | Tạo và tải file `hen-ho.ics`. |
 
+### `admin/common.js` (dùng chung cho 2 trang admin)
+
+**Mỗi trang sở hữu một phần của `config.json`:**
+- Trang thiết kế ghi `layout.portrait` và `layout.landscape`.
+- Trang form ghi mọi trường còn lại, kể cả `layout.mode`.
+
+| Hàm | Vai trò |
+|---|---|
+| `fetchConfig(localUrl)` | Có token: đọc qua API có xác thực (luôn mới). Không có: `readConfig(localUrl)`. |
+| `saveConfig(mutate)` | GET bản mới nhất → `mutate(remote)` → PUT kèm `sha` của bản vừa đọc. Gặp 409/422 (có người vừa ghi) thì làm lại 1 lần. Gặp 401/403/404 thì mở hộp token. Trả `null` nếu người dùng huỷ. Vì luôn trộn vào bản mới nhất, lưu ở trang này **không xoá** thay đổi đã lưu từ trang kia. |
+| `putFile(path, b64, message)` | Commit một file (ảnh tải lên), trả về commit sha |
+| `askToken()` | Hộp `<dialog>` nhập repo và token (tạo khi dùng lần đầu), lưu `localStorage['invite-gh']` |
+| `toast(msg)`, `setStatus(text, cls)` | Thông báo, trạng thái trên header |
+
+### `admin/design/index.html` (trang thiết kế)
+- Toàn màn hình: thanh công cụ, trang thiết kế lớn nhất có thể (giữ tỷ lệ chuẩn, dùng `cq` units của khung chứa), bảng thuộc tính bên phải. Dưới 900px thì xếp dọc.
+- `load()`: `fetchConfig` → `ed.set(layout)`. Chưa có thiết kế thì tạo bản dọc mặc định và tính là "Chưa lưu".
+- **Áp dụng:** `saveConfig(remote => ({ ...remote, layout: { ...remote.layout, mode: 'free', ...ed.get() } }))`. Lưu thiết kế đồng thời bật chế độ tự thiết kế.
+- **Xem thử:** mở trang thiệp ở tab mới với hash chứa thiết kế chưa lưu. Tab được mở ngay khi bấm (trước bước `await`), để trình duyệt không chặn popup.
+- **Quay lại tab** (sự kiện `focus`, khi có token): tải lại nội dung, theme, ảnh nền từ config đã lưu; giữ nguyên thiết kế đang sửa.
+
 ### `admin/index.html` (trang cấu hình)
 
 | Hàm | Vai trò |
 |---|---|
-| `load()` | Có token: đọc `config.json` qua API có xác thực (luôn mới, lấy `sha`). Không có: `readConfig('../config.json')`. Sau đó `fill()` và ghi nhận trạng thái đã lưu. |
+| `load()` | `fetchConfig('../config.json')` → `fill()` → ghi nhận trạng thái đã lưu |
 | `fill(c)` / `read()` | Cấu hình → form, form → cấu hình. `read()` là nguồn sự thật khi lưu. |
 | `update()` | Debounce 200ms sau mỗi `input`: `pack(read())` → đổi hash của iframe xem trước, cập nhật trạng thái "Chưa lưu"/"Đã lưu". |
-| `apply()` | PUT `config.json`. Lỗi 409/422 (sha cũ) thì đọc lại sha và thử 1 lần. Lỗi 401/403/404 thì mở lại hộp nhập token. |
-| `askToken()` | `<dialog>` nhập `owner/repo` và token, lưu vào `localStorage['invite-gh']`. |
-| `compress(file)` / `upload(file)` | Resize ≤ 2400px → WebP 0.82 (JPEG nếu trình duyệt không encode được WebP) → PUT `uploads/<timestamp>.webp` → URL raw gắn commit SHA. |
+| `apply()` | `saveConfig`: ghi các trường của form và `layout.mode`, **giữ nguyên** `layout.portrait/landscape` đang có trên GitHub |
+| `lay` | Bản thiết kế đọc từ config, chỉ dùng cho khung xem trước. Thiết kế không được tính vào trạng thái "Chưa lưu" của form. |
+| sự kiện `focus` | Quay lại từ tab thiết kế: lấy thiết kế mới cho khung xem trước. Nếu form không có thay đổi chưa lưu thì tải lại toàn bộ. |
+| `compress(file)` / `upload(file)` | Resize ≤ 2400px → WebP 0.82 (JPEG nếu trình duyệt không encode được WebP) → `putFile('uploads/<timestamp>.webp')` → URL raw gắn commit SHA. |
 | `syncBg()` | Đồng bộ ô ảnh tuỳ chỉnh, thanh trượt, hiển thị %, gợi ý chế độ từ chối. |
 | scrollspy | IntersectionObserver trên `form > fieldset` tô đậm mục đang xem trong thanh mục lục. |
 

@@ -204,12 +204,19 @@ assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
 {
   const a = await ctx.newPage(); await a.setViewportSize({ width: 1440, height: 900 });
   a.on('pageerror', e => errors.push('designer: ' + e.message));
+  // The form only links to the designer (separate page) when "Tự thiết kế" is chosen.
   await a.goto(BASE + 'admin/'); await a.waitForSelector('#status:has-text("Đã lưu")');
-  assert.ok(await a.locator('#s-design[hidden]').count(), 'designer hidden in template mode');
-  await a.check('[name=layoutMode][value=free]', { force: true }); await a.waitForTimeout(400);
-  assert.ok(await a.isVisible('#s-design'), 'designer shown in free mode');
+  assert.ok(!(await a.isVisible('#designLink')), 'no designer link in template mode');
+  await a.check('[name=layoutMode][value=free]', { force: true });
+  assert.ok(await a.isVisible('#designLink a[href="design/"]'), 'designer link in free mode');
+  assert.equal(await a.locator('.board').count(), 0, 'no designer embedded in the form page');
+  await a.goto(BASE + 'admin/design'); await a.waitForSelector('.ed-stage .board .it');
+  assert.ok(a.url().endsWith('/admin/design/'), 'designer page at /admin/design/');
   assert.equal(await a.locator('.board .it').count(), 5, 'default portrait has 5 blocks');
-  await a.locator('#s-design').scrollIntoViewIfNeeded();
+  await a.waitForSelector('#status:has-text("Chưa lưu")'); // a brand-new design can be applied right away
+  const stage = await a.locator('.ed-stage').boundingBox(), brd = await a.locator('.ed-stage .board').boundingBox();
+  assert.ok(brd.height > 600 && brd.y + brd.height <= 900, 'board uses the full height of the screen: ' + Math.round(brd.height));
+  assert.ok(Math.abs(brd.width / brd.height - 390 / 844) < .01, 'portrait board keeps 390:844');
   // Read the title item back from what is rendered (its inline CSS variables).
   const title = () => a.evaluate(() => {
     const el = document.querySelector('.board .it[data-id=title]');
@@ -270,7 +277,20 @@ assert.ok(cnt.some(v => v !== '00'), 'countdown ticking');
   await a.click('#apply'); await a.waitForSelector('#status:has-text("Đã lưu")');
   const saved = JSON.parse(stored).layout;
   assert.equal(saved.mode, 'free'); assert.equal(saved.portrait.items.length, 6); assert.equal(saved.landscape.items.length, 6);
+  assert.equal(JSON.parse(stored).to, 'Linh', 'designer save keeps the form fields');
+  // Preview opens the invite with the current design.
+  const [pop] = await Promise.all([a.waitForEvent('popup'), a.click('#preview')]);
+  await pop.waitForSelector('body.ready'); assert.ok(await pop.locator('.board-wrap').count(), 'preview shows the free layout'); await pop.close();
   await a.close();
+  // Form save afterwards keeps the designer's layout (each page owns its fields).
+  const fm = await ctx.newPage(); await fm.goto(BASE + 'admin/'); await fm.waitForSelector('#status:has-text("Đã lưu")');
+  await fm.fill('[name=to]', 'Linh2'); await fm.waitForSelector('#status:has-text("Chưa lưu")');
+  await fm.click('#apply'); await fm.waitForSelector('#status:has-text("Đã lưu")');
+  const merged = JSON.parse(stored);
+  assert.equal(merged.to, 'Linh2'); assert.equal(merged.layout.portrait.items.length, 6, 'form save keeps the design');
+  assert.equal(merged.layout.mode, 'free');
+  await fm.fill('[name=to]', 'Linh'); await fm.click('#apply'); await fm.waitForSelector('#status:has-text("Đã lưu")');
+  await fm.close();
 
   const show = async (w, h, o) => {
     const v = await ctx.newPage(); await v.setViewportSize({ width: w, height: h });

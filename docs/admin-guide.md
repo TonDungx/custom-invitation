@@ -24,7 +24,7 @@ Mở `https://tondungx.github.io/custom-invitation/admin`. Gõ `/admin` hay `/ad
 - **< 960px:** một cột, xem trước nằm cuối trang.
 - **< 640px:** ẩn chữ "· cấu hình", chữ trạng thái và nút "Mở trang" để header vừa màn hình.
 
-## Header
+## Header (trang form)
 
 | Thành phần | Chức năng |
 |---|---|
@@ -42,10 +42,15 @@ Mở `https://tondungx.github.io/custom-invitation/admin`. Gõ `/admin` hay `/ad
 - **Tiêu đề:** dòng chữ lớn đầu thư. Tiêu đề hiện lần lượt từng chữ, nên câu ngắn 4–8 chữ trông đẹp nhất.
 - **Lời nhắn:** đoạn văn. **Enter** để xuống dòng, xuống dòng được giữ nguyên trên thiệp.
 
-- **Bố cục trang lời nhắn:** *Bố cục mẫu* (như cũ) hoặc *Tự thiết kế (kéo thả)*. Chọn Tự thiết kế thì hiện mục **Thiết kế** ngay bên dưới và trong mục lục.
+- **Bố cục trang lời nhắn:** *Bố cục mẫu* (như cũ) hoặc *Tự thiết kế (kéo thả)*. Chọn Tự thiết kế thì hiện nút **Mở trình thiết kế ↗**, và mục **Thiết kế ↗** trong mục lục.
 
-### Thiết kế (chế độ Tự thiết kế)
-Trang thiết kế hiển thị đúng như thiệp thật (theme, font, ảnh nền, lớp phủ). Nội dung vẫn sửa ở mục Lời mời và Thời gian, trang thiết kế tự cập nhật.
+### Trang thiết kế (`/admin/design`, tab riêng)
+Mở bằng nút **Mở trình thiết kế ↗**, hoặc vào thẳng `https://tondungx.github.io/custom-invitation/admin/design`.
+
+- Trang thiết kế hiển thị đúng như thiệp thật (theme, font, ảnh nền, lớp phủ), lấy theo **cấu hình đã lưu**. Muốn thấy nội dung vừa sửa ở form thì bấm Áp dụng ở form trước. Quay lại tab thiết kế, nội dung tự cập nhật (cần đã kết nối GitHub).
+- Header có: **← Cấu hình** (về form), trạng thái, **Xem thử ↗** (mở thiệp với thiết kế chưa lưu trong tab mới), **Áp dụng** (Ctrl+S).
+- **Áp dụng ở trang thiết kế** chỉ lưu bố cục và tự bật chế độ Tự thiết kế. **Áp dụng ở form** lưu phần còn lại và giữ nguyên thiết kế. Hai trang không xoá thay đổi của nhau.
+- Lần đầu mở (chưa có thiết kế), trang tạo sẵn 5 khối giống bố cục mẫu, trạng thái "Chưa lưu".
 
 **Thanh công cụ:**
 

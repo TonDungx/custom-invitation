@@ -7,6 +7,8 @@
 | Admin báo "Lỗi khi lưu (5xx)" hoặc lỗi mạng | GitHub gặp sự cố hoặc mất mạng | Thử lại. Thay đổi vẫn còn trong form miễn là chưa đóng tab. |
 | Mở admin ở máy khác không thấy nút lưu hoạt động | Token chỉ lưu ở trình duyệt cũ | Nhập token (tạo mới nếu không còn) |
 | Admin hiện nội dung cũ hơn bản đã lưu | Chưa có token nên admin đọc qua API không xác thực hoặc qua Pages (có cache) | Kết nối GitHub: khi có token, admin luôn đọc bản mới nhất |
+| Trang thiết kế hiện tên, tiêu đề cũ | Trang thiết kế dùng nội dung đã lưu | Bấm Áp dụng ở form, rồi quay lại tab thiết kế (tự cập nhật nếu đã kết nối GitHub), hoặc tải lại trang |
+| Khung xem trước ở form chưa có thiết kế mới | Chưa bấm Áp dụng ở trang thiết kế, hoặc chưa kết nối GitHub nên không tự tải lại | Áp dụng ở trang thiết kế, rồi tải lại trang form |
 | `git push` bị `rejected (fetch first)` | Admin đã commit lên `main` | `git pull --rebase && git push` |
 | Sửa code xong push nhưng web chưa đổi | Pages đang build hoặc CDN cache 10 phút | `gh api repos/TonDungx/custom-invitation/pages/builds/latest --jq .status`, chờ `built` rồi thêm tối đa 10 phút |
 | Ảnh nền không hiện | URL không phải `https`, ảnh bị xoá hoặc chặn hotlink, link Unsplash chết | Dùng **Tải ảnh từ máy** thay cho link ngoài. Kiểm tra trong tab Network. |

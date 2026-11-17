@@ -66,7 +66,8 @@ Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã c
 | **Bốc hơi:** 1 lần bấm, nút bị xoá, hạt tự dọn | Chế độ vanish |
 | **Ẩn nút:** không có nút từ chối | Chế độ off |
 | Đồng hồ đếm ngược có số khác 0 | Đếm ngược. Ngày test luôn ở năm sau nên assert này không hết hạn. |
-| **Thiết kế:** ẩn khi ở bố cục mẫu; bật Tự thiết kế có 5 khối mặc định | Chuyển chế độ |
+| **Thiết kế:** form chỉ hiện nút "Mở trình thiết kế" khi chọn Tự thiết kế, không nhúng trình thiết kế | Tách trang |
+| `/admin/design` → `/admin/design/`; 5 khối mặc định, "Chưa lưu"; trang thiết kế cao > 600px trên màn 900px, đúng tỷ lệ 390:844 | Trang thiết kế toàn màn hình |
 | Kéo lệch 3px thì bị hít vào gióng hoặc mép gần nhất; giữ Alt thì kéo tự do | Hít dính |
 | Kéo cạnh phải: rộng ra, tâm dịch sang phải | Co giãn cạnh |
 | Kéo góc: cỡ chữ tăng | Co giãn góc |
@@ -75,7 +76,9 @@ Yêu cầu: Node 18 trở lên (đã chạy trên Node 24), Google Chrome đã c
 | Ctrl+Z, Ctrl+Shift+Z, Delete, Ctrl+Z | Lịch sử, phím tắt |
 | Chữ tự do `<img onerror>` hiện thành chữ trên thiệp | XSS |
 | Tạo bản ngang từ bản dọc → 6 phần tử | Bản ngang |
-| Lưu → `layout.mode = free`, đủ 2 bản | Lưu |
+| Lưu ở trang thiết kế → `layout.mode = free`, đủ 2 bản, **vẫn giữ** `to` của form | Lưu và trộn |
+| Xem thử → tab mới hiện trang tự thiết kế | Xem thử |
+| Sửa `to` ở form rồi lưu → thiết kế **vẫn còn** đủ 6 phần tử | Mỗi trang sở hữu phần của mình |
 | Điện thoại 390×844: bản dọc phủ kín, tâm phần tử đúng (cx%, cy%) trong 2px | Hiển thị |
 | Laptop 1280×800: hiện bản ngang | Chọn bản theo hướng |
 | Laptop khi chưa có bản ngang: bản dọc ở giữa, tỷ lệ 390:844 | Dự phòng |

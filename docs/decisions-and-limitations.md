@@ -54,6 +54,13 @@ Khung che cả khối chữ làm dòng thứ 2 bị cắt giữa chừng, trông
 - **Kỹ thuật:** CSS container query units, Pointer Events thuần. Không dùng Moveable, interact.js hay canvas (Fabric.js). Phân tích BMAD: `_bmad-output/planning-artifacts/freeform-editor-analysis.md` (chỉ có trên máy, không commit).
 - **Đánh đổi:** phải thiết kế hai lần nếu muốn đẹp trên màn ngang. Màn hình tỷ lệ lạ (máy gập, siêu rộng) sẽ có khoảng trống.
 
+### QĐ-10: Trình thiết kế là trang riêng; mỗi trang sở hữu một phần config
+- **Bối cảnh:** người dùng muốn trình thiết kế "mở sang hẳn một link mới, tách khỏi dạng điền form".
+- **Chọn:** `/admin/design` toàn màn hình. Code dùng chung tách ra `admin/common.js` (lưu, token, thông báo) và `admin/admin.css`.
+- **Vấn đề khi có 2 trang:** cả hai cùng ghi `config.json`; nếu mỗi trang ghi đè toàn bộ thì trang lưu sau sẽ xoá thay đổi của trang kia.
+- **Giải pháp:** `saveConfig(mutate)` luôn đọc bản mới nhất rồi chỉ thay phần của mình. Trang thiết kế ghi `layout.portrait/landscape` (và bật `mode: free`); trang form ghi mọi trường còn lại cùng `layout.mode`.
+- **Đánh đổi:** trang thiết kế hiển thị nội dung **đã lưu** của form, không phải nội dung đang gõ dở ở tab form.
+
 ## Giới hạn đã biết
 
 | Giới hạn | Ảnh hưởng | Cách khắc phục (nếu cần) |

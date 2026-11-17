@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>Thiết kế thiệp</title>
+<script>/* relative paths need a trailing slash: /admin/design -> /admin/design/ */
+if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);</script>
+<link rel="preconnect" href="https://api.github.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Be+Vietnam+Pro:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="../admin.css">
+<link rel="stylesheet" href="../../board.css">
+<style>
+/* Full-screen designer: board in the middle, properties on the right. */
+body { overflow: hidden; }
+h1 a { color: var(--muted); text-decoration: none; font-size: 1.1rem; margin-right: .75rem; transition: color .2s; }
+h1 a:hover { color: var(--fg); }
+.editor.full {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "bar props" "stage props" "tip props"; column-gap: 1.5rem;
+  height: calc(100svh - var(--head)); padding: 1rem clamp(1rem, 2vw, 1.5rem);
+}
+.editor.full .ed-bar { grid-area: bar; }
+.editor.full .ed-stage, .editor.full .ed-empty { grid-area: stage; }
+.editor.full .ed-stage { container-type: size; padding: 1.5rem; }
+.editor.full .ed-tip { grid-area: tip; margin: .6rem 0 0; }
+.editor.full .ed-props { grid-area: props; overflow: auto; }
+/* Board as large as the stage allows, keeping its reference ratio. */
+.editor.full .ed-stage .board[data-o="portrait"] { height: min(100cqh, 100cqw * 844 / 390); width: auto; }
+.editor.full .ed-stage .board[data-o="landscape"] { width: min(100cqw, 100cqh * 1440 / 900); height: auto; }
+@media (max-width: 900px) {
+  body { overflow: auto; }
+  .editor.full { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "tip" "props"; height: auto; grid-template-rows: auto 75svh auto auto; }
+  .editor.full .ed-props { margin-top: 1rem; }
+}
+</style>
+<script src="../../shared.js"></script>
+<script src="../common.js"></script>
+<script src="../editor.js"></script>
+</head>
+<body>
+<header>
+  <h1><a href="../" title="Về trang cấu hình">← Cấu hình</a>Thiết kế</h1>
+  <div class="bar">
+    <p class="status" id="status" role="status"><span>Đang tải…</span></p>
+    <button class="btn ghost" id="preview" type="button">Xem thử ↗</button>
+    <button class="btn solid" id="apply" type="button" disabled>Áp dụng</button>
+  </div>
+</header>
+<main id="editor" class="editor full"></main>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+let base = structuredClone(DEFAULT), saved = '';
+
+// Content (names, title, theme, background…) comes from the saved config; this page only edits layout.
+const ed = createEditor({ mount: $('#editor'), getCfg: () => base, onChange: refreshState });
+const dirty = () => JSON.stringify(ed.get()) !== saved;
+function refreshState() {
+  const d = dirty();
+  $('#apply').disabled = !d;
+  setStatus(d ? 'Chưa lưu' : 'Đã lưu', d ? 'dirty' : '');
+}
+
+async function load() {
+  base = await fetchConfig('../../config.json');
+  const isNew = !base.layout?.portrait;
+  ed.set(base.layout); ed.ensurePortrait();
+  saved = isNew ? '' : JSON.stringify(ed.get()); // a fresh default design counts as unsaved
+  refreshState();
+}
+
+// Write only the layout into the latest remote config, and switch the invite to it.
+async function apply() {
+  const btn = $('#apply'); btn.disabled = true; setStatus('Đang lưu…', 'dirty');
+  const design = ed.get();
+  try {
+    const res = await saveConfig(remote => ({ ...remote, layout: { ...(remote.layout || {}), mode: 'free', ...design } }));
+    if (!res) { btn.disabled = false; return refreshState(); }
+    base = { ...structuredClone(DEFAULT), ...res };
+    saved = JSON.stringify(design); refreshState();
+    toast('Đã lưu thiết kế. Thiệp dùng bố cục tự thiết kế, hiển thị sau khoảng 1 phút.');
+  } catch (e) {
+    setStatus('Lỗi khi lưu', 'error'); btn.disabled = false; toast('Không lưu được (' + e.message + '). Thử lại.');
+  }
+}
+
+// Open the invite with this (unsaved) design. Window opened synchronously so popup blockers allow it.
+$('#preview').onclick = async () => {
+  const w = window.open('', '_blank');
+  const hash = await pack({ ...base, layout: { mode: 'free', ...ed.get() } });
+  if (w) w.location = new URL('../../#' + hash, location.href).href;
+};
+$('#apply').onclick = apply;
+addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (dirty()) apply(); } });
+addEventListener('beforeunload', e => { if (dirty()) e.preventDefault(); });
+// Back from the form tab: refresh texts/theme/background, keep the design being edited.
+addEventListener('focus', async () => {
+  if (!hasToken() || document.getElementById('dlg')?.open) return;
+  base = await fetchConfig('../../config.json'); ed.refresh();
+});
+
+load();
+</script>
+</body>
+</html>
