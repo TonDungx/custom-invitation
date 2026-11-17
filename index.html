@@ -21,6 +21,11 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
+/* Thin themed scrollbar: standard props (Chrome 121+/Firefox) + WebKit fallback (Safari). */
+html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg) 22%, transparent) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--fg) 40%, transparent); }
 body {
   background: var(--bg); color: var(--fg);
   font: 300 1rem/1.75 var(--body);
