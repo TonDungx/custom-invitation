@@ -1,6 +1,6 @@
-// Shared by index.html and admin/: defaults, themes, link encoding.
-// Config lives in the URL hash (compressed) -> no backend needed.
-// ponytail: no server storage; add one only if you need a short fixed link that updates in place.
+// Shared by index.html and admin/: defaults, themes, backgrounds, URL helpers, config loading.
+// Saved config = config.json in the GitHub repo (written by admin via the contents API).
+// URL hash (compressed JSON) is only used for the admin live preview. See docs/architecture.md.
 
 const DEFAULT = {
   to: 'Em',

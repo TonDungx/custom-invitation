@@ -18,6 +18,8 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': types[path.extname(f)] || 'text/plain' }); fs.createReadStream(f).pipe(r);
 }).listen(5178);
 const BASE = 'http://localhost:5178/';
+// Always in the future, so the countdown assertion never expires.
+const YEAR = new Date().getFullYear() + 1, DATE = `${YEAR}-12-24T19:30`;
 
 // Fake GitHub contents API (one file in memory).
 let stored = null, puts = 0, uploaded = null;
@@ -57,7 +59,7 @@ assert.ok(!(await page.isVisible('#bgCustom')), 'custom URL field hidden unless 
 
 await page.fill('[name=to]', 'Linh');
 await page.fill('[name=from]', 'Minh');
-await page.fill('[name=date]', '2026-12-24T19:30');
+await page.fill('[name=date]', DATE);
 const s1 = '#stops .stop:nth-child(1) ';
 await page.fill(s1 + '[data-k=name]', 'Nhà hàng Sen <script>alert(1)</script>');
 await page.fill(s1 + '[data-k=address]', '12 Lý Thái Tổ, Hà Nội');
@@ -166,7 +168,7 @@ await m.screenshot({ path: OUT + '/dodge.png' });
 assert.ok(!(await m.locator('#rsvp.yes').count()), 'decline did nothing');
 await m.click('#yes'); await m.waitForTimeout(2400);
 const dl = m.waitForEvent('download'); await m.click('#ics');
-assert.match(fs.readFileSync(await (await dl).path(), 'utf8'), /DTSTART:20261224T193000/);
+assert.match(fs.readFileSync(await (await dl).path(), 'utf8'), new RegExp(`DTSTART:${YEAR}1224T193000`));
 // Other decline modes, configured through the URL hash (same path the admin preview uses).
 for (const mode of ['smoke', 'vanish']) {
   const p = await ctx.newPage(); await p.setViewportSize({ width: 390, height: 844 });
